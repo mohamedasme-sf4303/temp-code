@@ -35,7 +35,7 @@ stages:
 
   - job: DockerBuild
     pool:
-      vmImage: ubuntu-latest
+      name: boldbi-self-host-build-testing-agent
 
     steps:
 
