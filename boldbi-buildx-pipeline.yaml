@@ -180,6 +180,7 @@ stages:
         unzip BoldBI*.zip
         cd BoldBIServer-Linux
         wget https://raw.githubusercontent.com/mohamedasme-sf4303/temp-code/refs/heads/main/boldbi-manifets.txt
+        ls
 
       displayName: Download Package
 
@@ -267,7 +268,7 @@ stages:
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           -t "$IMAGE" \
-          -f .boldbi-manifets.txt .
+          -f boldbi-manifets.txt .
 
       displayName: Selfhost Buildx
       condition: eq('${{ parameters.buildType }}', 'selfhost')
