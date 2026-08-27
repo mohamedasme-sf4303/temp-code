@@ -174,7 +174,8 @@ stages:
     #################################################
 
     - bash: |
-
+        sudo apt-get update
+        sudo apt-get install ca-certificates curl zip -y
         wget ${{ parameters.boldbiPackage }}
         unzip BoldBI*.zip
         cd BoldBIServer-Linux
