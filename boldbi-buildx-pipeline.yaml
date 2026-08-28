@@ -76,6 +76,7 @@ stages:
 
     - bash: |
         echo "Installing Azure CLI..."
+        apt-get update
         curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
         echo "Azure Login..."
         az login --service-principal \
