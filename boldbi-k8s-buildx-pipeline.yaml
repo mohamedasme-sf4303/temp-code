@@ -28,6 +28,11 @@ parameters:
       - dev
       - production
 
+  - name: github_branch
+    displayName: BoldBI CI BranchName
+    type: string
+    default: development
+
 stages:
 
 - stage: Build
@@ -61,9 +66,9 @@ stages:
     - bash: |
 
         if [ "${{ parameters.environment }}" = "dev" ]; then
-          REPO="syncfusion/dev-boldbi-docker"
+          REPO="syncfusion/dev-bold"
         else
-          REPO="syncfusion/boldbi"
+          REPO="syncfusion/bold"
         fi
 
         echo "##vso[task.setvariable variable=REPOSITORY]$REPO"
@@ -174,16 +179,137 @@ stages:
     # Download Package
     #################################################
 
-    - bash: |
-        sudo apt-get update
-        sudo apt-get install ca-certificates curl zip -y
-        wget ${{ parameters.boldbiPackage }}
-        unzip BoldBI*.zip
-        cd BoldBIServer-Linux
-        wget https://raw.githubusercontent.com/mohamedasme-sf4303/temp-code/refs/heads/main/boldbi-manifets.txt
-        ls
+    - task: Syncfusion Gitea Checkout@1
+      inputs:
+        giteaUrl: 'https://gitea.syncfusion.com/bold-bi/boldbi-ci'
+        branch: '${{ parameters.github_branch }}'
+      displayName: 'Checkout boldbi-ci'
 
-      displayName: Download Package
+    - script: |
+        ls -la
+        mkdir -p boldbi-ci
+        shopt -s extglob
+        cp -r !(boldbi-ci) boldbi-ci/
+      displayName: 'Organize files into boldbi-ci'
+
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          sudo wget "${{ parameters.linux_package }}"
+          sudo apt install -y unzip
+          sudo unzip BoldBI*.zip
+
+          if [ -d "$(HomeDirectory)/BoldBIServer-Linux" ]; then
+              TARGET_DIR="$(HomeDirectory)/BoldBIServer-Linux"
+              echo "##vso[task.setvariable variable=extractPath]$TARGET_DIR"
+
+          elif [ -d "$(HomeDirectory)/BoldBIEnterpriseEdition-Linux" ]; then
+              TARGET_DIR="$(HomeDirectory)/BoldBIEnterpriseEdition-Linux"
+              echo "##vso[task.setvariable variable=extractPath]$TARGET_DIR"
+
+          else
+              echo "ERROR: Extracted package folder not found."
+              exit 1
+          fi
+
+          if [ -z "${{ parameters.imageTag }}" ]; then
+            IMAGE_TAG=$(echo "${{ parameters.linux_package }}" | grep -oP 'Linux_\K[\d\.]+_\d{8}_\d{6}')
+          else
+            IMAGE_TAG="${{ parameters.imageTag }}"
+          fi
+          echo "##vso[task.setvariable variable=TAG]$IMAGE_TAG"
+          echo "Using TAG: $IMAGE_TAG"
+
+          sudo rm -f BoldBI*.zip
+
+          sudo mkdir -p $TARGET_DIR/application/idp/web/appdatafiles
+
+          sudo cp -r $TARGET_DIR/application/utilities/installutils \
+                     $TARGET_DIR/application/idp/web/appdatafiles/installutils
+          sudo cp -r $TARGET_DIR/application/utilities/installutils \
+                     $TARGET_DIR/application/idp/api/appdatafiles/installutils
+          sudo cp -r $TARGET_DIR/application/utilities/installutils \
+                     $TARGET_DIR/application/idp/ums/appdatafiles/installutils          
+
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/id_web/* \
+                     $TARGET_DIR/application/idp/web/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/id_ums/* \
+                     $TARGET_DIR/application/idp/ums/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/id_api/* \
+                     $TARGET_DIR/application/idp/api/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/designer/* \
+                     $TARGET_DIR/application/bi/dataservice/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bi_api/* \
+                     $TARGET_DIR/application/bi/api/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bi_jobs/* \
+                     $TARGET_DIR/application/bi/jobs/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bi_web/* \
+                     $TARGET_DIR/application/bi/web/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bold_ai/* \
+                     $TARGET_DIR/application/ai/aiservice/
+          sudo cp -r $(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bold_etl/* \
+                     $TARGET_DIR/application/etl/etlservice/
+          sudo cp $TARGET_DIR/application/app_data/configuration/product.json \
+                     $TARGET_DIR/application/idp/api/
+          sudo cp $TARGET_DIR/application/app_data/configuration/product.json \
+                     $TARGET_DIR/application/idp/ums/
+
+          sudo cp -r $TARGET_DIR/application/app_data/* \
+                     $TARGET_DIR/application/idp/web/appdatafiles/installutils/app_data/
+
+          sudo unzip -o $TARGET_DIR/clientlibrary/clientlibrary.zip \
+                     -d $TARGET_DIR/application/bi/dataservice/optional-libs
+
+          # sudo mkdir -p $TARGET_DIR/application/bi/dataservice/puppeteer/Linux-901912
+          sudo ls $TARGET_DIR/application/
+          sudo ls $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome
+          # sudo rm $TARGET_DIR/application/chrome-linux.zip
+          # sudo wget https://sendit.sh/cM3v6/r9jfw.zip
+          # sudo ls
+          # sudo mv r9jfw.zip chrome-linux.zip
+          # sudo ls
+          # sudo cp chrome-linux.zip $TARGET_DIR/application/
+          # sudo ls $TARGET_DIR/application/
+          # sudo unzip -o $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome/chrome-linux64.zip \
+          #            -d $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome
+          # sudo mv $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome/chrome-linux64/* \
+          #             $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome/
+          # sudo chmod -R 777 $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome/
+          # sudo rm -rf $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome/chrome-linux64
+          # sudo rm -rf $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome/chrome-linux64.zip
+          
+          sudo ls $TARGET_DIR/application/bi/dataservice/puppeteer/Chrome
+
+          destDir="$TARGET_DIR/"
+          ubuntuDir="$(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/dockerfiles/debian/"
+          arm64Dir="$(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/dockerfiles/debian-arm64/"
+          manifestDir="$(HomeDirectory)/boldbi-ci/installscripts/jenkins-ci/kubernetes/dockerfiles/mainfest/"
+          for txtFile in "$arm64Dir"*.txt; do
+            [ -f "$txtFile" ] || continue
+            filename=$(basename "$txtFile")
+            imageName=$(echo "$filename" | sed 's/^[^-]*-//' | sed 's/\.txt$//')
+            sudo cp "$txtFile" "$destDir/${imageName}.Dockerfile"
+          done
+
+          for txtFile in "$ubuntuDir"*.txt; do
+            [ -f "$txtFile" ] || continue
+            filename=$(basename "$txtFile")
+            imageName=$(echo "$filename" | sed 's/^[^-]*-//' | sed 's/\.txt$//')
+            sudo cp "$txtFile" "$destDir/${imageName}-amd64.Dockerfile"
+          done
+
+          for txtFile in "$manifestDir"*.txt; do
+            [ -f "$txtFile" ] || continue
+            filename=$(basename "$txtFile")
+            imageName=$(echo "$filename" | sed 's/^[^-]*-//' | sed 's/\.txt$//')
+            sudo cp "$txtFile" "$destDir/${imageName}-manifest.Dockerfile"
+          done
+
+          echo "Prepared Dockerfiles:"
+          sudo ls -la "$destDir"/*.Dockerfile
+      displayName: 'Prepare Application and Dockerfiles'
+
 
     #################################################
     # Docker Install
@@ -227,15 +353,80 @@ stages:
 
     - bash: |
 
-        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}"
+        IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
+        IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
+        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
+        BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
+        BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
+        BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
+        BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
+        BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
+        BI_AI_IMAGE="$(REPOSITORY)-ai:${{ parameters.imageTag }}"
         docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
         cd BoldBIServer-Linux
 
+        echo "IDP_WEB image creation"
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
-          -t "$IMAGE" \
-          -f boldbi-manifets.txt .
+          -t "$IDP_WEB_IMAGE" \
+          -f identity-manifest.Dockerfile .
+
+        echo "IDP_API image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_API_IMAGE" \
+          -f identity-api-manifest.Dockerfile .
+
+        echo "IDP_UMS image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_UMS_IMAGE" \
+          -f ums-manifest.Dockerfile .
+
+        echo "BI_WEB_IMAGE image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_WEB_IMAGE" \
+          -f server-manifest.Dockerfile .
+
+        echo "BI_API_IMAGE image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_API_IMAGE" \
+          -f server-api-manifest.Dockerfile .
+
+        echo "BI_JOBS_IMAGE image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_JOBS_IMAGE" \
+          -f server-jobs-manifest.Dockerfile .
+
+        echo "BI_DESIGNER_IMAGE image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_DESIGNER_IMAGE" \
+          -f designer-manifest.Dockerfile .
+
+        echo "BI_ETL_IMAGE image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_ETL_IMAGE" \
+          -f etl-manifest.Dockerfile .
+
+        echo "BI_AI_IMAGE image creation"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_AI_IMAGE" \
+          -f ai-manifest.Dockerfile .
 
       displayName: Cloud Buildx
       condition: eq('${{ parameters.buildType }}', 'cloud')
@@ -250,26 +441,96 @@ stages:
           --name boldbi-builder \
           --driver remote \
           tcp://$(AMD64_BUILDX_IP):1234
-
         docker buildx create \
           --append \
           --name boldbi-builder \
           --driver remote \
           tcp://$(ARM64_BUILDX_IP):1234
-
         docker buildx use boldbi-builder
-
         docker buildx inspect --bootstrap
 
-        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}"
-
+        IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
+        IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
+        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
+        BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
+        BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
+        BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
+        BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
+        BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
+        BI_AI_IMAGE="$(REPOSITORY)-ai:${{ parameters.imageTag }}"
         cd BoldBIServer-Linux
 
+        echo "IDP_WEB image creation"
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
-          -t "$IMAGE" \
-          -f boldbi-manifets.txt .
+          --push \
+          -t "$IDP_WEB_IMAGE" \
+          -f identity-manifest.Dockerfile .
+
+        echo "IDP_API image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_API_IMAGE" \
+          -f identity-api-manifest.Dockerfile .
+
+        echo "IDP_UMS image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_UMS_IMAGE" \
+          -f ums-manifest.Dockerfile .
+
+        echo "BI_WEB_IMAGE image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_WEB_IMAGE" \
+          -f server-manifest.Dockerfile .
+
+        echo "BI_API_IMAGE image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_API_IMAGE" \
+          -f server-api-manifest.Dockerfile .
+
+        echo "BI_JOBS_IMAGE image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_JOBS_IMAGE" \
+          -f server-jobs-manifest.Dockerfile .
+
+        echo "BI_DESIGNER_IMAGE image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_DESIGNER_IMAGE" \
+          -f designer-manifest.Dockerfile .
+
+        echo "BI_ETL_IMAGE image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_ETL_IMAGE" \
+          -f etl-manifest.Dockerfile .
+
+        echo "BI_AI_IMAGE image creation"
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_AI_IMAGE" \
+          -f ai-manifest.Dockerfile .
 
       displayName: Selfhost Buildx
       condition: eq('${{ parameters.buildType }}', 'selfhost')
