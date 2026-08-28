@@ -196,7 +196,7 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          sudo wget "${{ parameters.linux_package }}"
+          sudo wget "${{ parameters.boldbiPackage }}"
           sudo apt install -y unzip
           sudo unzip BoldBI*.zip
 
@@ -214,7 +214,7 @@ stages:
           fi
 
           if [ -z "${{ parameters.imageTag }}" ]; then
-            IMAGE_TAG=$(echo "${{ parameters.linux_package }}" | grep -oP 'Linux_\K[\d\.]+_\d{8}_\d{6}')
+            IMAGE_TAG=$(echo "${{ parameters.boldbiPackage }}" | grep -oP 'Linux_\K[\d\.]+_\d{8}_\d{6}')
           else
             IMAGE_TAG="${{ parameters.imageTag }}"
           fi
