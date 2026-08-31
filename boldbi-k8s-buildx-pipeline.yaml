@@ -436,103 +436,127 @@ stages:
     #################################################
 
     - bash: |
-
         docker buildx create \
           --name boldbi-builder \
           --driver remote \
           tcp://$(AMD64_BUILDX_IP):1234
+    
         docker buildx create \
           --append \
           --name boldbi-builder \
           --driver remote \
           tcp://$(ARM64_BUILDX_IP):1234
+    
         docker buildx use boldbi-builder
         docker buildx inspect --bootstrap
+        docker buildx prune -af || true
+        docker buildx use boldbi-builder
+        docker buildx inspect --bootstrap
+      displayName: Initialize Buildx Builder
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
+    - bash: |
         IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
-        IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
-        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
-        BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
-        BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
-        BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
-        BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
-        BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
-        BI_AI_IMAGE="$(REPOSITORY)-ai:${{ parameters.imageTag }}"
         cd BoldBIServer-Linux
-
-        echo "IDP_WEB image creation"
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_WEB_IMAGE" \
           -f identity-manifest.Dockerfile .
+      displayName: Build Identity Web
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "IDP_API image creation"
+    - bash: |
+        IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_API_IMAGE" \
           -f identity-api-manifest.Dockerfile .
+      displayName: Build Identity API
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "IDP_UMS image creation"
+    - bash: |
+        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_UMS_IMAGE" \
           -f ums-manifest.Dockerfile .
+      displayName: Build UMS
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "BI_WEB_IMAGE image creation"
+    - bash: |
+        BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_WEB_IMAGE" \
           -f server-manifest.Dockerfile .
+      displayName: Build BI Server
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "BI_API_IMAGE image creation"
+    - bash: |
+        BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_API_IMAGE" \
           -f server-api-manifest.Dockerfile .
+      displayName: Build BI Server API
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "BI_JOBS_IMAGE image creation"
-        docker buildx build \
-          --builder boldbi-builder \
-          --platform linux/amd64,linux/arm64 \
-          --push \
-          -t "$BI_JOBS_IMAGE" \
-          -f server-jobs-manifest.Dockerfile .
+    - bash: |
+      BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
+      cd BoldBIServer-Linux
+  
+      docker buildx build \
+        --builder boldbi-builder \
+        --platform linux/amd64,linux/arm64 \
+        --push \
+        -t "$BI_JOBS_IMAGE" \
+        -f server-jobs-manifest.Dockerfile .
+    displayName: Build BI Jobs
+    condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "BI_DESIGNER_IMAGE image creation"
+    - bash: |
+        BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_DESIGNER_IMAGE" \
           -f designer-manifest.Dockerfile .
+      displayName: Build BI Designer
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
-        echo "BI_ETL_IMAGE image creation"
+    - bash: |
+        BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --builder boldbi-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_ETL_IMAGE" \
           -f etl-manifest.Dockerfile .
-
-        echo "BI_AI_IMAGE image creation"
-        docker buildx build \
-          --builder boldbi-builder \
-          --platform linux/amd64,linux/arm64 \
-          --push \
-          -t "$BI_AI_IMAGE" \
-          -f ai-manifest.Dockerfile .
-
-      displayName: Selfhost Buildx
+      displayName: Build ETL
       condition: eq('${{ parameters.buildType }}', 'selfhost')
 
     #################################################
