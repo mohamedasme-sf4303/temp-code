@@ -521,17 +521,17 @@ stages:
       condition: eq('${{ parameters.buildType }}', 'selfhost')
 
     - bash: |
-      BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
-      cd BoldBIServer-Linux
-  
-      docker buildx build \
-        --builder boldbi-builder \
-        --platform linux/amd64,linux/arm64 \
-        --push \
-        -t "$BI_JOBS_IMAGE" \
-        -f server-jobs-manifest.Dockerfile .
-    displayName: Build BI Jobs
-    condition: eq('${{ parameters.buildType }}', 'selfhost')
+        BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+    
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_JOBS_IMAGE" \
+          -f server-jobs-manifest.Dockerfile .
+      displayName: Build BI Jobs
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
     - bash: |
         BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
