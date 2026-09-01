@@ -33,6 +33,47 @@ parameters:
     type: string
     default: development
 
+  - name: All
+    displayName: Build All Images
+    type: boolean
+    default: false
+  - name: id_web
+    displayName: Build id_web (Identity)
+    type: boolean
+    default: false
+  - name: id_api
+    displayName: Build id_api
+    type: boolean
+    default: false
+  - name: id_ums
+    displayName: Build id_ums
+    type: boolean
+    default: false
+  - name: bi_designer
+    displayName: Build BI Designer
+    type: boolean
+    default: false
+  - name: bi_web
+    displayName: Build BI Web
+    type: boolean
+    default: false
+  - name: bi_api
+    displayName: Build BI API
+    type: boolean
+    default: false
+  - name: bi_jobs
+    displayName: Build BI Jobs
+    type: boolean
+    default: false
+  - name: bold_etl
+    displayName: Build Bold ETL
+    type: boolean
+    default: false
+  - name: bold_ai
+    displayName: Build Bold AI
+    type: boolean
+    default: false
+
 stages:
 
 - stage: Build
@@ -362,8 +403,8 @@ stages:
           -t "$IDP_WEB_IMAGE" \
           -f identity-manifest.Dockerfile .
       displayName: Build Identity Web
-      condition: eq('${{ parameters.buildType }}', 'cloud')
-
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.id_web }}', true), eq('${{ parameters.All }}', true)))
+      
     - bash: |
         IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
         docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
@@ -375,7 +416,7 @@ stages:
           -t "$IDP_API_IMAGE" \
           -f identity-api-manifest.Dockerfile .
       displayName: Build Identity API
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.id_api }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
@@ -388,7 +429,7 @@ stages:
           -t "$IDP_UMS_IMAGE" \
           -f ums-manifest.Dockerfile .
       displayName: Build UMS
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.id_ums }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
@@ -401,7 +442,7 @@ stages:
           -t "$BI_WEB_IMAGE" \
           -f server-manifest.Dockerfile .
       displayName: Build BI Server
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.bi_web }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
@@ -414,7 +455,7 @@ stages:
           -t "$BI_API_IMAGE" \
           -f server-api-manifest.Dockerfile .
       displayName: Build BI Server API
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.bi_api }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
@@ -427,7 +468,7 @@ stages:
           -t "$BI_JOBS_IMAGE" \
           -f server-jobs-manifest.Dockerfile .
       displayName: Build BI Jobs
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.bi_jobs }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
@@ -440,7 +481,7 @@ stages:
           -t "$BI_DESIGNER_IMAGE" \
           -f designer-manifest.Dockerfile .
       displayName: Build BI Designer
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.bi_designer }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
@@ -453,7 +494,20 @@ stages:
           -t "$BI_ETL_IMAGE" \
           -f etl-manifest.Dockerfile .
       displayName: Build ETL
-      condition: eq('${{ parameters.buildType }}', 'cloud')
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.bold_etl }}', true), eq('${{ parameters.All }}', true)))
+
+    - bash: |
+        BI_AI_IMAGE="$(REPOSITORY)-ai:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_AI_IMAGE" \
+          -f ai-manifest.Dockerfile .
+      displayName: Build AI
+      condition: and(eq('${{ parameters.buildType }}', 'cloud'), or(eq('${{ parameters.bold_ai }}', true), eq('${{ parameters.All }}', true)))
 
     #################################################
     # Selfhost Build
@@ -490,7 +544,7 @@ stages:
           -t "$IDP_WEB_IMAGE" \
           -f identity-manifest.Dockerfile .
       displayName: Build Identity Web
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.id_web }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
@@ -503,7 +557,7 @@ stages:
           -t "$IDP_API_IMAGE" \
           -f identity-api-manifest.Dockerfile .
       displayName: Build Identity API
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.id_api }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
@@ -516,7 +570,7 @@ stages:
           -t "$IDP_UMS_IMAGE" \
           -f ums-manifest.Dockerfile .
       displayName: Build UMS
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.id_ums }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
@@ -529,7 +583,7 @@ stages:
           -t "$BI_WEB_IMAGE" \
           -f server-manifest.Dockerfile .
       displayName: Build BI Server
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.bi_web }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
@@ -542,7 +596,7 @@ stages:
           -t "$BI_API_IMAGE" \
           -f server-api-manifest.Dockerfile .
       displayName: Build BI Server API
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.bi_api }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
@@ -555,7 +609,7 @@ stages:
           -t "$BI_JOBS_IMAGE" \
           -f server-jobs-manifest.Dockerfile .
       displayName: Build BI Jobs
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.bi_jobs }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
@@ -568,7 +622,7 @@ stages:
           -t "$BI_DESIGNER_IMAGE" \
           -f designer-manifest.Dockerfile .
       displayName: Build BI Designer
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.bi_designer }}', true), eq('${{ parameters.All }}', true)))
 
     - bash: |
         BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
@@ -581,7 +635,20 @@ stages:
           -t "$BI_ETL_IMAGE" \
           -f etl-manifest.Dockerfile .
       displayName: Build ETL
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.bold_etl }}', true), eq('${{ parameters.All }}', true)))
+
+    - bash: |
+        BI_AI_IMAGE="$(REPOSITORY)-ai:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+        
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_AI_IMAGE" \
+          -f ai-manifest.Dockerfile .
+      displayName: Build AI
+      condition: and(eq('${{ parameters.buildType }}', 'selfhost'), or(eq('${{ parameters.bold_ai }}', true), eq('${{ parameters.All }}', true)))
 
     #################################################
     # Stop VMs
