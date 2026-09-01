@@ -352,83 +352,107 @@ stages:
     #################################################
 
     - bash: |
-
         IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
-        IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
-        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
-        BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
-        BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
-        BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
-        BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
-        BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
-        BI_AI_IMAGE="$(REPOSITORY)-ai:${{ parameters.imageTag }}"
         docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
         cd BoldBIServer-Linux
-
-        echo "IDP_WEB image creation"
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_WEB_IMAGE" \
           -f identity-manifest.Dockerfile .
+      displayName: Build Identity Web
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "IDP_API image creation"
+    - bash: |
+        IDP_API_IMAGE="$(REPOSITORY)-identity-api:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_API_IMAGE" \
           -f identity-api-manifest.Dockerfile .
+      displayName: Build Identity API
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "IDP_UMS image creation"
+    - bash: |
+        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_UMS_IMAGE" \
           -f ums-manifest.Dockerfile .
+      displayName: Build UMS
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "BI_WEB_IMAGE image creation"
+    - bash: |
+        BI_WEB_IMAGE="$(REPOSITORY)bi-server:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_WEB_IMAGE" \
           -f server-manifest.Dockerfile .
+      displayName: Build BI Server
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "BI_API_IMAGE image creation"
+    - bash: |
+        BI_API_IMAGE="$(REPOSITORY)bi-server-api:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_API_IMAGE" \
           -f server-api-manifest.Dockerfile .
+      displayName: Build BI Server API
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "BI_JOBS_IMAGE image creation"
+    - bash: |
+        BI_JOBS_IMAGE="$(REPOSITORY)bi-server-jobs:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_JOBS_IMAGE" \
           -f server-jobs-manifest.Dockerfile .
+      displayName: Build BI Jobs
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "BI_DESIGNER_IMAGE image creation"
+    - bash: |
+        BI_DESIGNER_IMAGE="$(REPOSITORY)bi-designer:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_DESIGNER_IMAGE" \
           -f designer-manifest.Dockerfile .
+      displayName: Build BI Designer
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-        echo "BI_ETL_IMAGE image creation"
+    - bash: |
+        BI_ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+        cd BoldBIServer-Linux
+    
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$BI_ETL_IMAGE" \
           -f etl-manifest.Dockerfile .
-
-        echo "BI_AI_IMAGE image creation"
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --push \
-          -t "$BI_AI_IMAGE" \
-          -f ai-manifest.Dockerfile .
-
-      displayName: Cloud Buildx
+      displayName: Build ETL
       condition: eq('${{ parameters.buildType }}', 'cloud')
 
     #################################################
