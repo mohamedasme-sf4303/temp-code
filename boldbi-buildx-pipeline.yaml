@@ -25,6 +25,7 @@ steps:
           --resource-group "testing" \
           --name "$(VM_NAME)" \
           --image "$IMAGE_ID" \
+          --size "Standard_D2ps_v5" \
           --vnet-name "vnet-centralindia" \
           --subnet "default" \
           --public-ip-address "" \
