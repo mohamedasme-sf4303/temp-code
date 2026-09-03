@@ -1,299 +1,55 @@
 trigger: none
 
-parameters:
+pool:
+  name: boldbi-sefl-host-amd64-vmss
 
-  - name: imageTag
-    displayName: Docker Image Tag
-    type: string
-    default: latest
+variables:
+  VM_NAME: test-vm-$(Build.BuildId)
 
-  - name: boldbiPackage
-    displayName: BoldBI Package
-    type: string
-    default: https://s3.amazonaws.com/files2.syncfusion.com/Installs/BoldBI/07-08-2026/BoldBIServer_Linux_Docker_16.2.5_08072026_091439.zip
+steps:
+  - bash: |
 
-  - name: buildType
-    displayName: Build Type
-    type: string
-    default: cloud
-    values:
-      - cloud
-      - selfhost
+        echo "Logging into Azure..."
 
-  - name: environment
-    displayName: Environment
-    type: string
-    default: dev
-    values:
-      - dev
-      - production
+        az login \
+          --service-principal \
+          -u "$(AZURE_CLIENT_ID)" \
+          -p "$(AZURE_CLIENT_SECRET)" \
+          --tenant "$(AZURE_TENANT_ID)"
 
-stages:
+        az account set --subscription "$(AZURE_SUBSCRIPTION_ID)"
+        IMAGE_ID="/subscriptions/43ad974e-d325-4d50-bcb6-afd2b4999892/resourceGroups/testing/providers/Microsoft.Compute/galleries/boldbi/images/arm64/versions/1.0.0"
+        echo "Creating VM..."
 
-- stage: Build
-  jobs:
+        az vm create \
+          --resource-group "testing" \
+          --name "$(VM_NAME)" \
+          --image "$IMAGE_ID" \
+          --vnet-name "vnet-centralindia" \
+          --subnet "default" \
+          --public-ip-address "" \
+          --nsg "" \
+          --admin-username azureuser \
+          --generate-ssh-keys
 
-  - job: DockerBuild
-    pool:
-      name: boldbi-self-host-build-testing-agent
+        echo "Waiting for VM provisioning..."
 
-    steps:
+        az vm wait \
+          --resource-group "testing" \
+          --name "$(VM_NAME)" \
+          --created
 
-    #################################################
-    # Validate Tag
-    #################################################
+        echo "Getting private IP..."
 
-    - bash: |
-        TAG="${{ parameters.imageTag }}"
-
-        if [[ ! "$TAG" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
-          echo "Invalid Docker image tag: $TAG"
-          exit 1
-        fi
-
-        echo "Image tag validation successful"
-      displayName: Validate image tag
-
-    #################################################
-    # Repository Selection
-    #################################################
-
-    - bash: |
-
-        if [ "${{ parameters.environment }}" = "dev" ]; then
-          REPO="syncfusion/dev-boldbi-docker"
-        else
-          REPO="syncfusion/boldbi"
-        fi
-
-        echo "##vso[task.setvariable variable=REPOSITORY]$REPO"
-
-      displayName: Set Docker Repository
-
-    #################################################
-    # Azure Login
-    #################################################
-
-    - bash: |
-        echo "Installing Azure CLI..."
-        apt-get update
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        echo "Azure Login..."
-        az login --service-principal \
-          -u $(AZURE_CLIENT_ID) \
-          -p $(AZURE_CLIENT_SECRET) \
-          --tenant $(AZURE_TENANT_ID)
-
-        az account set \
-          --subscription $(AZURE_SUBSCRIPTION_ID)
-
-      displayName: Azure Login
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
-
-    #################################################
-    # VM Start Logic
-    #################################################
-
-    - bash: |
-
-        STARTED=false
-
-        AMD_STATE=$(az vm get-instance-view \
-          -g $(RESOURCE_GROUP_NAME) \
-          -n $(AMD64_VM_NAME) \
-          --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" \
+        PRIVATE_IP=$(az vm list-ip-addresses \
+          --resource-group "testing" \
+          --name "$(VM_NAME)" \
+          --query "[0].virtualMachine.network.privateIpAddresses[0]" \
           -o tsv)
 
-        ARM_STATE=$(az vm get-instance-view \
-          -g $(RESOURCE_GROUP_NAME) \
-          -n $(ARM64_VM_NAME) \
-          --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" \
-          -o tsv)
+        echo "================================="
+        echo "VM Name    : $(VM_NAME)"
+        echo "Private IP : $PRIVATE_IP"
+        echo "================================="
 
-        echo "AMD64 VM: $AMD_STATE"
-        echo "ARM64 VM: $ARM_STATE"
-
-        if [ "$AMD_STATE" != "VM running" ]; then
-          echo "Starting AMD64 VM"
-          az vm start -g $(RESOURCE_GROUP_NAME) -n $(AMD64_VM_NAME)
-          STARTED=true
-        fi
-
-        if [ "$ARM_STATE" != "VM running" ]; then
-          echo "Starting ARM64 VM"
-          az vm start -g $(RESOURCE_GROUP_NAME) -n $(ARM64_VM_NAME)
-          STARTED=true
-        fi
-
-        echo "##vso[task.setvariable variable=PIPELINE_STARTED_VM]$STARTED"
-
-      displayName: Start Buildx VMs
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
-
-    #################################################
-    # Wait for VMs
-    #################################################
-
-    - bash: |
-        ATTEMPTS=30
-
-        for i in $(seq 1 $ATTEMPTS)
-        do
-
-          AMD=$(az vm get-instance-view \
-            -g $(RESOURCE_GROUP_NAME) \
-            -n $(AMD64_VM_NAME) \
-            --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" \
-            -o tsv)
-
-          ARM=$(az vm get-instance-view \
-            -g $(RESOURCE_GROUP_NAME) \
-            -n $(ARM64_VM_NAME) \
-            --query "instanceView.statuses[?starts_with(code,'PowerState/')].displayStatus" \
-            -o tsv)
-
-          echo "Attempt $i"
-          echo "AMD64 = $AMD"
-          echo "ARM64 = $ARM"
-
-          if [ "$AMD" = "VM running" ] && [ "$ARM" = "VM running" ]; then
-            echo "Both VMs are running"
-            exit 0
-          fi
-
-          sleep 10
-        done
-
-        echo "VM startup timeout (5 minutes)"
-        exit 1
-
-      displayName: Wait For VMs
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
-
-    #################################################
-    # Download Package
-    #################################################
-
-    - bash: |
-        sudo apt-get update
-        sudo apt-get install ca-certificates curl zip -y
-        wget ${{ parameters.boldbiPackage }}
-        unzip BoldBI*.zip
-        cd BoldBIServer-Linux
-        wget https://raw.githubusercontent.com/mohamedasme-sf4303/temp-code/refs/heads/main/boldbi-manifets.txt
-        ls
-
-      displayName: Download Package
-
-    #################################################
-    # Docker Install
-    #################################################
-
-    - bash: |
-
-        sudo apt-get update
-        sudo apt-get install ca-certificates curl -y
-        sudo install -m 0755 -d /etc/apt/keyrings
-        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-        sudo chmod a+r /etc/apt/keyrings/docker.asc
-        # Add the repository to Apt sources:
-        echo \
-          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-          sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-        sudo apt-get update
-        sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-        ARCH=amd64
-        BUILDX_URL=$(curl -s https://raw.githubusercontent.com/docker/actions-toolkit/main/.github/buildx-lab-releases.json | jq -r ".latest.assets[] | select(endswith(\"linux-$ARCH\"))")
-        # Download docker buildx with Build Cloud support
-        mkdir -vp ~/.docker/cli-plugins/
-        curl --silent -L --output ~/.docker/cli-plugins/docker-buildx $BUILDX_URL
-        chmod a+x ~/.docker/cli-plugins/docker-buildx
-      displayName: Docker Install
-
-    #################################################
-    # Docker Login
-    #################################################
-
-    - bash: |
-        echo "$(DOCKER_PASSWORD)" | docker login \
-          -u "$(DOCKER_USERNAME)" \
-          --password-stdin
-      displayName: Docker Login
-
-    #################################################
-    # Cloud Build
-    #################################################
-
-    - bash: |
-
-        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}"
-        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
-        cd BoldBIServer-Linux
-
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --push \
-          -t "$IMAGE" \
-          -f boldbi-manifets.txt .
-
-      displayName: Cloud Buildx
-      condition: eq('${{ parameters.buildType }}', 'cloud')
-
-    #################################################
-    # Selfhost Build
-    #################################################
-
-    - bash: |
-
-        docker buildx create \
-          --name boldbi-builder \
-          --driver remote \
-          tcp://$(AMD64_BUILDX_IP):1234
-
-        docker buildx create \
-          --append \
-          --name boldbi-builder \
-          --driver remote \
-          tcp://$(ARM64_BUILDX_IP):1234
-
-        docker buildx use boldbi-builder
-
-        docker buildx inspect --bootstrap
-
-        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}"
-
-        cd BoldBIServer-Linux
-
-        docker buildx build \
-          --builder boldbi-builder \
-          --platform linux/amd64,linux/arm64 \
-          -t "$IMAGE" \
-          -f boldbi-manifets.txt .
-
-      displayName: Selfhost Buildx
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
-
-    #################################################
-    # Stop VMs
-    #################################################
-
-    - bash: |
-
-        if [ "$(PIPELINE_STARTED_VM)" != "true" ]; then
-          echo "VMs were already running. Skip stopping."
-          exit 0
-        fi
-
-        echo "Stopping AMD64 VM"
-        az vm deallocate \
-           -g $(RESOURCE_GROUP_NAME) \
-           -n $(AMD64_VM_NAME)
-
-        echo "Stopping ARM64 VM"
-        az vm deallocate \
-           -g $(RESOURCE_GROUP_NAME) \
-           -n $(ARM64_VM_NAME)
-
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
-      displayName: Stop VMs
+    displayName: Create new VM
