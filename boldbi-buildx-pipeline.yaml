@@ -81,12 +81,19 @@ stages:
         IMAGE_ID="/subscriptions/43ad974e-d325-4d50-bcb6-afd2b4999892/resourceGroups/testing/providers/Microsoft.Compute/galleries/boldbi/images/arm64/versions/1.0.0"
         echo "Creating VM..."
 
+        az network nic create \
+          --resource-group testing \
+          --name "$(VM_NAME)" \
+          --vnet-name vnet-centralindia \
+          --subnet default
+  
         az vm create \
           --resource-group "testing" \
           --name "$(VM_NAME)" \
           --image "$IMAGE_ID" \
           --size "Standard_D2ps_v5" \
           --vnet-name "vnet-centralindia" \
+          --nics "$(VM_NAME)" \
           --subnet "default" \
           --public-ip-address "" \
           --admin-username azureuser \
@@ -188,8 +195,23 @@ stages:
     #################################################
 
     - bash: |
+        OS_DISK=$(az vm show \
+          --resource-group testing \
+          --name "$(VM_NAME)" \
+          --query "storageProfile.osDisk.name" \
+          -o tsv)
+        
         az vm delete \
-          --resource-group "testing" \
+          --resource-group testing \
           --name "$(VM_NAME)" \
           --yes
+        
+        az disk delete \
+          --resource-group testing \
+          --name "$OS_DISK" \
+          --yes
+        
+        az network nic delete \
+          --resource-group testing \
+          --name "$(VM_NAME)"
       displayName: Delete VMs
