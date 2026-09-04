@@ -81,18 +81,18 @@ stages:
         IMAGE_ID="/subscriptions/43ad974e-d325-4d50-bcb6-afd2b4999892/resourceGroups/testing/providers/Microsoft.Compute/galleries/boldbi/images/arm64/versions/1.0.0"
         echo "Creating VM..."
 
-        # az network nic create \
-        #   --resource-group testing \
-        #   --name "$(VM_NAME)" \
-        #   --vnet-name vnet-centralindia \
-        #   --subnet default
-
+        az network nic create \
+          --resource-group testing \
+          --name "$(VM_NAME)" \
+          --vnet-name vnet-centralindia \
+          --subnet default
+        
         az vm create \
           --resource-group testing \
           --name "$(VM_NAME)" \
           --image "$IMAGE_ID" \
           --size Standard_D2ps_v5 \
-          --public-ip-address "" \
+          --nics "$(VM_NAME)" \
           --admin-username azureuser \
           --generate-ssh-keys
 
