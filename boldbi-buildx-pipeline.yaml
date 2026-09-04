@@ -86,16 +86,13 @@ stages:
           --name "$(VM_NAME)" \
           --vnet-name vnet-centralindia \
           --subnet default
-  
+        
         az vm create \
-          --resource-group "testing" \
+          --resource-group testing \
           --name "$(VM_NAME)" \
           --image "$IMAGE_ID" \
-          --size "Standard_D2ps_v5" \
-          --vnet-name "vnet-centralindia" \
+          --size Standard_D2ps_v5 \
           --nics "$(VM_NAME)" \
-          --subnet "default" \
-          --public-ip-address "" \
           --admin-username azureuser \
           --generate-ssh-keys
 
