@@ -27,7 +27,7 @@ stages:
 
   - job: DockerBuild
     pool:
-      name: boldbi-self-host-build-testing-agent
+      name: boldbi-sefl-host-amd64-vmss
 
     steps:
 
