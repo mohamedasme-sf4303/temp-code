@@ -10,12 +10,12 @@ parameters:
   - name: boldbiPackage
     displayName: BoldBI Package
     type: string
-    default: https://s3.amazonaws.com/files2.syncfusion.com/Installs/BoldBI/07-08-2026/BoldBIServer_Linux_Docker_16.2.5_08072026_091439.zip
+    # default: https://s3.amazonaws.com/files2.syncfusion.com/Installs/BoldBI/07-08-2026/BoldBIServer_Linux_Docker_16.2.5_08072026_091439.zip
 
   - name: environment
     displayName: Environment
     type: string
-    default: dev
+    # default: dev
     values:
       - dev
       - production
