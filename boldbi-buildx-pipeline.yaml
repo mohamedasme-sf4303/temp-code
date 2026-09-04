@@ -89,7 +89,6 @@ stages:
           --vnet-name "vnet-centralindia" \
           --subnet "default" \
           --public-ip-address "" \
-          --nsg "" \
           --admin-username azureuser \
           --generate-ssh-keys
 
