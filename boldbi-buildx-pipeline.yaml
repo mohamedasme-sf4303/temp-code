@@ -28,6 +28,9 @@ parameters:
       - dev
       - production
 
+variables:
+  VM_NAME: test-vm-$(Build.BuildId)
+
 stages:
 
 - stage: Build
