@@ -6,6 +6,7 @@ pool:
 steps:
   - bash: |
         VM_NAME="test-vm-$(Build.BuildId)"
+        echo "$VM_NAME" 
         echo "Logging into Azure..."
 
         az login \
