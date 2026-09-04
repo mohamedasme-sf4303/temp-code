@@ -3,12 +3,9 @@ trigger: none
 pool:
   name: boldbi-sefl-host-amd64-vmss
 
-variables:
-  VM_NAME: test-vm-$(Build.BuildId)
-
 steps:
   - bash: |
-
+        VM_NAME="test-vm-$(Build.BuildId)"
         echo "Logging into Azure..."
 
         az login \
@@ -23,7 +20,7 @@ steps:
 
         az vm create \
           --resource-group "testing" \
-          --name "$(VM_NAME)" \
+          --name "$VM_NAME" \
           --image "$IMAGE_ID" \
           --size "Standard_D2ps_v5" \
           --vnet-name "vnet-centralindia" \
@@ -66,10 +63,10 @@ steps:
       #   --tenant "$(AZURE_TENANT_ID)"
 
       # az account set --subscription "$(AZURE_SUBSCRIPTION_ID)"
-
+      VM_NAME="test-vm-$(Build.BuildId)"
       az vm delete \
         --resource-group "testing" \
-        --name "$(VM_NAME)" \
+        --name "$VM_NAME" \
         --yes
 
       echo "VM deleted successfully."
