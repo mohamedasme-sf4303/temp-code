@@ -1,5 +1,7 @@
 trigger: none
-
+variables:
+  VM_NAME: test-vm-$(Build.BuildId)
+  
 parameters:
 
   - name: imageTag
