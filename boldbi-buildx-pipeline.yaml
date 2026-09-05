@@ -94,9 +94,9 @@ stages:
       displayName: Save ARM64 IP
       
     #################################################
-    # Wait For Image
+    # Verify Multi-Arch Image
     #################################################
-      
+    
     - bash: |
     
         if [ "${{ parameters.environment }}" = "dev" ]; then
@@ -107,38 +107,56 @@ stages:
     
         IMAGE="${REPO}:${{ parameters.imageTag }}"
     
-        echo "================================="
-        echo "Waiting for image: $IMAGE"
-        echo "================================="
-    
         echo "$(DOCKER_PASSWORD)" | docker login \
           -u "$(DOCKER_USERNAME)" \
           --password-stdin
+    
+        echo "================================="
+        echo "Waiting for image: $IMAGE"
+        echo "Checking:"
+        echo " - linux/amd64"
+        echo " - linux/arm64"
+        echo "================================="
     
         for i in {1..30}
         do
     
           echo "Attempt $i/30"
     
-          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+          OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>/dev/null)
+    
+          AMD64_FOUND=$(echo "$OUTPUT" | grep -c "linux/amd64")
+          ARM64_FOUND=$(echo "$OUTPUT" | grep -c "linux/arm64")
+    
+          echo "amd64 count : $AMD64_FOUND"
+          echo "arm64 count : $ARM64_FOUND"
+    
+          if [ "$AMD64_FOUND" -gt 0 ] && [ "$ARM64_FOUND" -gt 0 ]; then
+    
+            echo ""
             echo "================================="
-            echo "Image Found: $IMAGE"
+            echo "SUCCESS: Multi-Arch Image Found"
+            echo "Image: $IMAGE"
+            echo "linux/amd64 : OK"
+            echo "linux/arm64 : OK"
             echo "================================="
+    
             exit 0
+    
           fi
     
-          echo "Image not available yet..."
+          echo "Required architectures not available yet..."
           sleep 60
     
         done
     
+        echo ""
         echo "================================="
-        echo "ERROR: Image not found after 30 minutes"
-        echo "================================="
-    
+        echo "ERROR: Multi-Arch Image Not Found"
+        echo "Image: $IMAGE"
         exit 1
-    
-      displayName: Wait For Image
+    displayName: Wait For Image
+   
 
   ####################################################################
   # AMD64 JOB
