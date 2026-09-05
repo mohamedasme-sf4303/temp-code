@@ -81,11 +81,14 @@ stages:
 
         curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
+        az extension add --name azure-devops --yes
+        
         az pipelines variable-group variable create \
-          --group-id $(VARIABLE_GROUP_ID) \
-          --name "$VAR_NAME" \
-          --value "$ARM64_IP"
-
+        --organization "$(ADO_ORG_URL)" \
+        --project "$(ADO_PROJECT)" \
+        --group-id $(VARIABLE_GROUP_ID) \
+        --name "$VAR_NAME" \
+        --value "$ARM64_IP"
         echo "ARM64 IP stored"
 
       env:
