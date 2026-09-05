@@ -80,12 +80,8 @@ stages:
         echo "ARM64 IP: $ARM64_IP"
 
         curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        az devops configure \
-          --defaults \
-          organization="$(ADO_ORG_URL)" \
-          project="$(ADO_PROJECT)"
 
-        az pipelines variable-group variable update \
+        az pipelines variable-group variable create \
           --group-id $(VARIABLE_GROUP_ID) \
           --name "$VAR_NAME" \
           --value "$ARM64_IP"
@@ -153,7 +149,8 @@ stages:
     - bash: |
 
         VAR_NAME="ARM64_IP_$(Build.BuildId)"
-
+        sudo apt-get update
+        sudo apt-get install -y jq
         az devops configure \
           --defaults \
           organization="$(ADO_ORG_URL)" \
