@@ -160,6 +160,22 @@ stages:
 
     - bash: |
 
+        echo "Waiting for BuildKit endpoint on ARM VM..."
+
+        for i in {1..30}; do
+          if nc -z $(arm64_vm_private_ip) 1234; then
+            echo "BuildKit endpoint is reachable"
+            break
+          fi
+
+          echo "Waiting for BuildKit..."
+          sleep 10
+        done
+
+      displayName: Wait for BuildKit
+
+    - bash: |
+
         docker buildx create \
           --name boldbi-builder \
           --driver remote \
