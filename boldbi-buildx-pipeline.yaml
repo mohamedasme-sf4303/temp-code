@@ -92,41 +92,52 @@ stages:
         AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
 
       displayName: Save ARM64 IP
-
+      
     #################################################
     # Wait For Image
     #################################################
-
+      
     - bash: |
-
+    
         if [ "${{ parameters.environment }}" = "dev" ]; then
           REPO="syncfusion/dev-boldbi-docker"
         else
           REPO="syncfusion/boldbi"
         fi
-
+    
         IMAGE="${REPO}:${{ parameters.imageTag }}"
-
-        echo "Waiting for image $IMAGE"
-
+    
+        echo "================================="
+        echo "Waiting for image: $IMAGE"
+        echo "================================="
+    
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          -u "$(DOCKER_USERNAME)" \
+          --password-stdin
+    
         for i in {1..30}
         do
-
-          docker manifest inspect "$IMAGE" >/dev/null 2>&1
-
-          if [ $? -eq 0 ]; then
-            echo "Image Found"
+    
+          echo "Attempt $i/30"
+    
+          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "================================="
+            echo "Image Found: $IMAGE"
+            echo "================================="
             exit 0
           fi
-
-          echo "Attempt $i/30"
+    
+          echo "Image not available yet..."
           sleep 60
-
+    
         done
-
-        echo "Image not found after 30 minutes"
+    
+        echo "================================="
+        echo "ERROR: Image not found after 30 minutes"
+        echo "================================="
+    
         exit 1
-
+    
       displayName: Wait For Image
 
   ####################################################################
