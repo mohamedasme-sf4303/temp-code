@@ -79,6 +79,7 @@ stages:
         echo "Saving Variable: $VAR_NAME"
         echo "ARM64 IP: $ARM64_IP"
 
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
         az devops configure \
           --defaults \
           organization="$(ADO_ORG_URL)" \
