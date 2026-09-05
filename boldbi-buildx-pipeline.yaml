@@ -155,7 +155,7 @@ stages:
         echo "ERROR: Multi-Arch Image Not Found"
         echo "Image: $IMAGE"
         exit 1
-    displayName: Wait For Image
+      displayName: Wait For Image
    
 
   ####################################################################
