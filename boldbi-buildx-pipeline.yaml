@@ -108,7 +108,7 @@ stages:
           REPO="syncfusion/boldbi"
         fi
     
-        IMAGE="${REPO}:${{ parameters.imageTag }}"
+        IMAGE="${REPO}:${{ parameters.imageTag }}_$(Build.BuildId)"
     
         echo "$(DOCKER_PASSWORD)" | docker login \
           -u "$(DOCKER_USERNAME)" \
@@ -344,7 +344,7 @@ stages:
 
         docker buildx inspect --bootstrap
 
-        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}"
+        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)"
 
         cd BoldBIServer-Linux
 
