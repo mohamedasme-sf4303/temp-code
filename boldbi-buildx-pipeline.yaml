@@ -292,31 +292,31 @@ stages:
 
       displayName: Docker Login
 
-    #################################################
-    # Wait For ARM64 BuildKit
-    #################################################
+    # #################################################
+    # # Wait For ARM64 BuildKit
+    # #################################################
 
-    - bash: |
+    # - bash: |
 
-        echo "Waiting for ARM64 BuildKit..."
+    #     echo "Waiting for ARM64 BuildKit..."
 
-        for i in {1..30}
-        do
+    #     for i in {1..30}
+    #     do
 
-          if nc -z $(arm64_vm_private_ip) 1234; then
-            echo "BuildKit reachable"
-            exit 0
-          fi
+    #       if nc -z $(arm64_vm_private_ip) 1234; then
+    #         echo "BuildKit reachable"
+    #         exit 0
+    #       fi
 
-          echo "Waiting BuildKit..."
-          sleep 10
+    #       echo "Waiting BuildKit..."
+    #       sleep 10
 
-        done
+    #     done
 
-        echo "BuildKit not reachable"
-        exit 1
+    #     echo "BuildKit not reachable"
+    #     exit 1
 
-      displayName: Wait For BuildKit
+    #   displayName: Wait For BuildKit
 
     #################################################
     # Buildx
