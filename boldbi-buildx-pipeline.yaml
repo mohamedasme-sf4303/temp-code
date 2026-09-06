@@ -50,7 +50,7 @@ stages:
 
     - bash: |
 
-        TAG="${{ parameters.imageTag }}"
+        TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
 
         if [[ ! "$TAG" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
           echo "Invalid Docker image tag: $TAG"
