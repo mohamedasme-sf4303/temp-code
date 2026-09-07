@@ -79,8 +79,6 @@ stages:
         echo "Saving Variable: $VAR_NAME"
         echo "ARM64 IP: $ARM64_IP"
 
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
         az extension add --name azure-devops --yes
         
         az pipelines variable-group variable create \
@@ -181,8 +179,6 @@ stages:
     - bash: |
 
         VAR_NAME="ARM64_IP_$(Build.BuildId)"
-        sudo apt-get update
-        sudo apt-get install -y jq
         az devops configure \
           --defaults \
           organization="$(ADO_ORG_URL)" \
@@ -261,14 +257,6 @@ stages:
     #################################################
 
     - bash: |
-
-        sudo apt-get update
-
-        sudo apt-get install -y \
-          ca-certificates \
-          curl \
-          zip \
-          jq
 
         wget "${{ parameters.boldbiPackage }}"
 
