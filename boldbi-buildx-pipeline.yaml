@@ -40,7 +40,7 @@ stages:
     displayName: ARM64 IP + Wait For Image
 
     pool:
-      name: boldbi-sefl-host-arm64-vmss
+      name: boldbi-buildx-arm64-vmss-agent-pool
 
     steps:
 
@@ -168,7 +168,7 @@ stages:
     displayName: Build Docker Image
 
     pool:
-      name: boldbi-sefl-host-amd64-vmss
+      name: boldbi-buildx-amd64-vmss-agent-pool
 
     steps:
 
