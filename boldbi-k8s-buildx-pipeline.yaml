@@ -86,7 +86,7 @@ stages:
     displayName: ARM64 IP + Wait For Images
 
     pool:
-      name: boldbi-sefl-host-arm64-vmss
+      name: boldbi-buildx-arm64-vmss-agent-pool
 
     steps:
 
@@ -122,10 +122,6 @@ stages:
 
         echo "Saving Variable: $VAR_NAME"
         echo "ARM64 IP: $ARM64_IP"
-
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-        az extension add --name azure-devops --yes
 
         az pipelines variable-group variable create \
         --organization "$(ADO_ORG_URL)" \
@@ -260,7 +256,7 @@ stages:
     displayName: Build Docker Images
 
     pool:
-      name: boldbi-sefl-host-amd64-vmss
+      name: boldbi-buildx-amd64-vmss-agent-pool
 
     steps:
 
@@ -302,8 +298,7 @@ stages:
     - bash: |
 
         VAR_NAME="ARM64_IP_$(Build.BuildId)"
-        sudo apt-get update
-        sudo apt-get install -y jq
+
         az devops configure \
           --defaults \
           organization="$(ADO_ORG_URL)" \
