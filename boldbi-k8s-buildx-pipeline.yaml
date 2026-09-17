@@ -258,7 +258,8 @@ stages:
   ####################################################################
 
   - job: DockerBuild
-
+    workspace:
+      clean: all
     displayName: Build Docker Images
 
     pool:
