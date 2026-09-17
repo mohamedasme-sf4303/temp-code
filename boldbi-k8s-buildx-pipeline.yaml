@@ -265,7 +265,7 @@ stages:
       name: boldbi-buildx-amd64-vmss-agent-pool
 
     steps:
-
+    - checkout: none
     #################################################
     # Validate Tag
     #################################################
