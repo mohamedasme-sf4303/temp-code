@@ -202,10 +202,10 @@ stages:
 
         PENDING=("${IMAGES[@]}")
 
-        for i in {1..30}
+        for i in {1..40}
         do
 
-          echo "Attempt $i/30"
+          echo "Attempt $i/40"
 
           STILL_PENDING=()
 
