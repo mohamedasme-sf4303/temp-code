@@ -691,5 +691,5 @@ stages:
           --push \
           -t "$BI_MCP_IMAGE" \
           -f mcp-manifest.Dockerfile .
-      displayName: Build AI
-      condition: or(eq('${{ parameters.bold_ai }}', true), eq('${{ parameters.All }}', true))
+      displayName: Build MCP
+      condition: or(eq('${{ parameters.bold_mcp }}', true), eq('${{ parameters.All }}', true))
