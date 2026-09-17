@@ -474,6 +474,7 @@ stages:
           ubuntuDir="$WORK_DIR/boldbi-ci/installscripts/jenkins-ci/kubernetes/dockerfiles/debian/"
           arm64Dir="$WORK_DIR/boldbi-ci/installscripts/jenkins-ci/kubernetes/dockerfiles/debian-arm64/"
           manifestDir="$WORK_DIR/boldbi-ci/installscripts/jenkins-ci/kubernetes/dockerfiles/mainfest/"
+          ls "$manifestDir"*.txt
           for txtFile in "$arm64Dir"*.txt; do
             [ -f "$txtFile" ] || continue
             filename=$(basename "$txtFile")
@@ -491,6 +492,7 @@ stages:
           for txtFile in "$manifestDir"*.txt; do
             [ -f "$txtFile" ] || continue
             filename=$(basename "$txtFile")
+            echo "Processing: $(basename "$txtFile")"
             imageName=$(echo "$filename" | sed 's/^[^-]*-//' | sed 's/\.txt$//')
             sudo cp "$txtFile" "$destDir/${imageName}-manifest.Dockerfile"
           done
