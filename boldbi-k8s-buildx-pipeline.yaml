@@ -70,6 +70,10 @@ parameters:
     displayName: Build Bold AI
     type: boolean
     default: false
+  - name: bold_mcp
+    displayName: Build Bold MCP
+    type: boolean
+    default: false
 
 stages:
 
@@ -181,7 +185,9 @@ stages:
         if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.bold_ai }}" = "True" ]; then
           IMAGES+=("${REPO}-ai:${{ parameters.imageTag }}")
         fi
-
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.bold_MCP }}" = "True" ]; then
+          IMAGES+=("${REPO}-mcp:${{ parameters.imageTag }}")
+        fi
         if [ ${#IMAGES[@]} -eq 0 ]; then
           echo "No images selected to build. Nothing to verify."
           exit 0
@@ -429,6 +435,8 @@ stages:
                      $TARGET_DIR/application/bi/web/
           sudo cp -r $WORK_DIR/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bold_ai/* \
                      $TARGET_DIR/application/ai/aiservice/
+          sudo cp -r $WORK_DIR/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bold_mcp/* \
+                     $TARGET_DIR/application/ai/mcpservice/
           sudo cp -r $WORK_DIR/boldbi-ci/installscripts/jenkins-ci/kubernetes/shell_scripts/bold_etl/* \
                      $TARGET_DIR/application/etl/etlservice/
           sudo cp $TARGET_DIR/application/app_data/configuration/product.json \
@@ -670,5 +678,18 @@ stages:
           --push \
           -t "$BI_AI_IMAGE" \
           -f ai-manifest.Dockerfile .
+      displayName: Build AI
+      condition: or(eq('${{ parameters.bold_ai }}', true), eq('${{ parameters.All }}', true))
+
+    - bash: |
+        BI_MCP_IMAGE="$(REPOSITORY)-mcp:${{ parameters.imageTag }}"
+        cd BoldBIServer-Linux
+        
+        docker buildx build \
+          --builder boldbi-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$BI_MCP_IMAGE" \
+          -f mcp-manifest.Dockerfile .
       displayName: Build AI
       condition: or(eq('${{ parameters.bold_ai }}', true), eq('${{ parameters.All }}', true))
