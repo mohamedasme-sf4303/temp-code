@@ -1,0 +1,526 @@
+trigger: none
+
+variables:
+  ADO_ORG_URL: https://dev.azure.com/bold-bi
+  ADO_PROJECT: build
+  VARIABLE_GROUP_ID: 70
+
+parameters:
+
+- name: imageTag
+  displayName: Docker Image Tag
+  type: string
+  default: latest
+
+- name: linux_package
+  displayName: 'Docker Linux Package URL'
+  type: string
+  default: ''
+
+- name: environment
+  displayName: Environment
+  type: string
+  default: dev
+  values:
+    - dev
+    - production
+
+- name: imagesType
+  displayName: Images Type
+  type: string
+  default: eval
+  values:
+    - debian
+    - eval
+    - both
+
+- name: utility_branch_name
+  displayName: 'Utility Branch Name'
+  type: string
+  default: 'development'
+
+- name: packageType
+  displayName: 'Package Type. Note: If you are using Bold Reports version 12.2 below with Docker packages, or if you are using Linux packages, you need to choose the move_files option.'
+  type: string
+  values:
+    - move_files
+    - no_move_files
+  default: move_files
+
+stages:
+
+- stage: Build
+
+  jobs:
+
+  ####################################################################
+  # ARM64 JOB
+  ####################################################################
+
+  - job: Arm64Job
+
+    displayName: ARM64 IP + Wait For Image
+
+    pool:
+      name: boldreports-docker-image-vmss-agent-pool-arm64
+
+    steps:
+
+    #################################################
+    # Validate Tag
+    #################################################
+
+    - bash: |
+
+        TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
+
+        if [[ ! "$TAG" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
+          echo "Invalid Docker image tag: $TAG"
+          exit 1
+        fi
+
+        echo "Image tag validation successful"
+
+      displayName: Validate Tag
+
+    #################################################
+    # Save ARM64 IP
+    #################################################
+
+    - bash: |
+
+        ARM64_IP=$(hostname -I | awk '{print $1}')
+
+        if [ -z "$ARM64_IP" ]; then
+          echo "ARM64 IP not found"
+          exit 1
+        fi
+
+        VAR_NAME="BOLDREPORTS_ARM64_IP_$(Build.BuildId)"
+
+        echo "Saving Variable: $VAR_NAME"
+        echo "ARM64 IP: $ARM64_IP"
+
+        az extension add --name azure-devops --yes
+
+        az pipelines variable-group variable create \
+        --organization "$(ADO_ORG_URL)" \
+        --project "$(ADO_PROJECT)" \
+        --group-id $(VARIABLE_GROUP_ID) \
+        --name "$VAR_NAME" \
+        --value "$ARM64_IP"
+        echo "ARM64 IP stored"
+
+      env:
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
+
+      displayName: Save ARM64 IP
+
+    #################################################
+    # Verify Multi-Arch Images
+    #################################################
+
+    - bash: |
+
+        if [ "${{ parameters.environment }}" = "dev" ]; then
+          REPO="syncfusion/dev-boldreports-docker"
+        else
+          REPO="syncfusion/boldreports"
+        fi
+
+        TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
+        IMAGES_TYPE="${{ parameters.imagesType }}"
+
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          -u "$(DOCKER_USERNAME)" \
+          --password-stdin
+
+        check_image() {
+
+          local IMAGE="$1"
+          local LABEL="$2"
+
+          for i in {1..30}
+          do
+
+            echo "[$LABEL] Attempt $i/30 : $IMAGE"
+
+            OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>/dev/null)
+
+            AMD64_FOUND=$(echo "$OUTPUT" | grep -c "linux/amd64")
+            ARM64_FOUND=$(echo "$OUTPUT" | grep -c "linux/arm64")
+
+            echo "[$LABEL] amd64 count : $AMD64_FOUND"
+            echo "[$LABEL] arm64 count : $ARM64_FOUND"
+
+            if [ "$AMD64_FOUND" -gt 0 ] && [ "$ARM64_FOUND" -gt 0 ]; then
+              echo "[$LABEL] SUCCESS: Multi-Arch Image Found : $IMAGE"
+              return 0
+            fi
+
+            echo "[$LABEL] Required architectures not available yet..."
+            sleep 60
+
+          done
+
+          echo "[$LABEL] ERROR: Multi-Arch Image Not Found : $IMAGE"
+          return 1
+
+        }
+
+        echo "================================="
+        echo "Images Type : $IMAGES_TYPE"
+        echo "Waiting for images:"
+        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          echo " - ${REPO}:${TAG}"
+        fi
+        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          echo " - ${REPO}:${TAG}_eval"
+        fi
+        echo "Checking architectures:"
+        echo " - linux/amd64"
+        echo " - linux/arm64"
+        echo "================================="
+
+        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          check_image "${REPO}:${TAG}" "DEBIAN" || exit 1
+        fi
+
+        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          check_image "${REPO}:${TAG}_eval" "EVAL" || exit 1
+        fi
+
+        echo ""
+        echo "================================="
+        echo "SUCCESS: Requested Multi-Arch Image(s) Found"
+        echo "================================="
+
+      displayName: Wait For Images
+
+  ####################################################################
+  # AMD64 JOB
+  ####################################################################
+
+  - job: DockerBuild
+
+    displayName: Build Docker Image
+
+    pool:
+      name: boldreports_docker_image_vmss_agent_pool
+
+    steps:
+
+    #################################################
+    # Wait for ARM64 IP
+    #################################################
+
+    - bash: |
+
+        VAR_NAME="BOLDREPORTS_ARM64_IP_$(Build.BuildId)"
+        az devops configure \
+          --defaults \
+          organization="$(ADO_ORG_URL)" \
+          project="$(ADO_PROJECT)"
+
+        echo "Waiting for ARM64 IP..."
+
+        for i in {1..30}
+        do
+
+          ARM64_IP=$(az pipelines variable-group variable list \
+            --group-id $(VARIABLE_GROUP_ID) \
+            --output json \
+            | jq -r --arg v "$VAR_NAME" '.[$v].value // empty')
+
+          if [ -n "$ARM64_IP" ]; then
+
+            echo "ARM64 IP Found: $ARM64_IP"
+
+            echo "##vso[task.setvariable variable=arm64_vm_private_ip]$ARM64_IP"
+
+            exit 0
+
+          fi
+
+          echo "Waiting..."
+          sleep 10
+
+        done
+
+        echo "ARM64 IP not found within 5 minutes"
+        exit 1
+
+      env:
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
+
+      displayName: Wait For ARM64 IP
+
+    #################################################
+    # Get Current AMD64 VM IP
+    #################################################
+
+    - bash: |
+
+        AMD64_IP=$(hostname -I | awk '{print $1}')
+
+        if [ -z "$AMD64_IP" ]; then
+          echo "AMD64 IP not found"
+          exit 1
+        fi
+
+        echo "AMD64 IP: $AMD64_IP"
+
+        echo "##vso[task.setvariable variable=amd64_vm_private_ip]$AMD64_IP"
+
+      displayName: Get AMD64 VM IP
+
+    #################################################
+    # Repository Selection
+    #################################################
+
+    - bash: |
+
+        if [ "${{ parameters.environment }}" = "dev" ]; then
+          REPO="syncfusion/dev-boldreports-docker"
+        else
+          REPO="syncfusion/boldreports"
+        fi
+
+        echo "##vso[task.setvariable variable=REPOSITORY]$REPO"
+
+      displayName: Set Docker Repository
+
+    #################################################
+    # Download Package & Utilities
+    #################################################
+
+    - bash: |
+
+        cd "$(Build.SourcesDirectory)"
+        sudo rm -rf *
+        wget "${{ parameters.linux_package }}"
+        unzip BoldReports*.zip
+        rm -f BoldReports*.zip
+
+        # Detect package folder
+        if [ -d "$(Build.SourcesDirectory)/BoldReportsServer-Linux" ]; then
+            EXTRACT_PATH="$(Build.SourcesDirectory)/BoldReportsServer-Linux"
+        elif [ -d "$(Build.SourcesDirectory)/BoldReports_EnterpriseReporting-Linux" ]; then
+            EXTRACT_PATH="$(Build.SourcesDirectory)/BoldReports_EnterpriseReporting-Linux"
+        else
+            echo "ERROR: Bold Reports package folder not found."
+            exit 1
+        fi
+
+        echo "##vso[task.setvariable variable=extractPath]$EXTRACT_PATH"
+
+      displayName: Download & Extract Package
+
+    #################################################
+    # Clone Bold Reports Utilities (if move_files)
+    #################################################
+
+    - ${{ if eq(parameters.packageType, 'move_files') }}:
+      - task: Syncfusion Gitea Checkout@1
+        inputs:
+          giteaUrl: 'https://gitea.syncfusion.com/bold-reports/bold-reports-utilities'
+          branch: '${{ parameters.utility_branch_name }}'
+        displayName: 'Clone Bold Reports Utilities'
+
+    #################################################
+    # Docker Login
+    #################################################
+
+    - bash: |
+
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          -u "$(DOCKER_USERNAME)" \
+          --password-stdin
+
+      displayName: Docker Login
+
+    #################################################
+    # Wait For ARM64 BuildKit
+    #################################################
+
+    - bash: |
+
+        echo "Waiting for ARM64 BuildKit..."
+
+        for i in {1..30}
+        do
+
+          if nc -z $(arm64_vm_private_ip) 1234; then
+            echo "BuildKit reachable"
+            exit 0
+          fi
+
+          echo "Waiting BuildKit..."
+          sleep 10
+
+        done
+
+        echo "BuildKit not reachable"
+        exit 1
+
+      displayName: Wait For BuildKit
+
+    #################################################
+    # Prepare Files (move_files mode)
+    #################################################
+
+    - ${{ if eq(parameters.packageType, 'move_files') }}:
+      - bash: |
+
+          utilityBasePath="$(Build.SourcesDirectory)/bold-reports-utilities/build/dockerfiles/latest/single-docker-image"
+
+          echo "=== MOVE_FILES MODE ==="
+          echo "Utility base path: $utilityBasePath"
+          ls -R "$utilityBasePath/" || true
+
+          # Get version
+          if [ -f "$(extractPath)/application/app_data/configuration/product.json" ]; then
+              configFilePath="$(extractPath)/application/app_data/configuration/product.json"
+          elif [ -f "$(extractPath)/application/product.json" ]; then
+              configFilePath="$(extractPath)/application/product.json"
+          else
+              echo "##[error]product.json not found"
+              exit 1
+          fi
+
+          version=$(jq -r '.BoldProducts[0].Version' "$configFilePath")
+          idpVersion=$(jq -r '.BoldProducts[0].IDPVersion' "$configFilePath")
+          echo "Version: $version | IDPVersion: $idpVersion"
+
+          # Update utility product.json
+          if [ -f "$utilityBasePath/product.json" ]; then
+            sed -i "s|\"Version\": *\"[^\"]*\"|\"Version\": \"$version\"|g" "$utilityBasePath/product.json"
+            sed -i "s|\"IDPVersion\": *\"[^\"]*\"|\"IDPVersion\": \"$idpVersion\"|g" "$utilityBasePath/product.json"
+          fi
+
+          # Copy main Dockerfiles
+          echo "Copying Dockerfiles..."
+          cp -v "$utilityBasePath/dockerfiles/"* "$(extractPath)/" || true
+
+          # Copy other files
+          cp -rv "$utilityBasePath/boldreports-nginx-config" "$(extractPath)/application/" || true
+          cp -v "$utilityBasePath/entrypoint.sh" "$(extractPath)/application/" || true
+          cp -v "$utilityBasePath/product.json" "$(extractPath)/application/" || true
+          cp -rv "$utilityBasePath/clientlibrary" "$(extractPath)/application/" || true
+
+          # Unzip client libraries
+          if [ -f "$(extractPath)/application/clientlibrary/boldreports/clientlibraries.zip" ]; then
+            cd "$(extractPath)/application/clientlibrary/boldreports/"
+            unzip -o clientlibraries.zip -d "$(extractPath)/application/clientlibrary/clientlibraries/"
+          fi
+
+          # MoveSharedFiles
+          mkdir -p "$(extractPath)/application/clientlibrary/MoveSharedFiles/app_data/configuration"
+          cp -v "$(extractPath)/application/product.json" "$(extractPath)/application/clientlibrary/MoveSharedFiles/app_data/configuration/"
+
+          cp -r "$(extractPath)/application/clientlibrary/"* "$(extractPath)/application/utilities/" || true
+
+          mkdir -p "$(extractPath)/application/idp/web/appdatafiles"
+          cp -r "$(extractPath)/application/clientlibrary/MoveSharedFiles" "$(extractPath)/application/idp/web/appdatafiles/"
+          rm -rf "$(extractPath)/application/app_data"
+
+          # Line endings
+          dos2unix "$(extractPath)/application/entrypoint.sh" || true
+          dos2unix "$(extractPath)/application/clientlibrary/install-optional.libs.sh" || true
+
+          echo "=== Files prepared for buildx ==="
+
+        displayName: 'Prepare Files (move_files)'
+
+    - ${{ else }}:
+      - bash: |
+
+          echo "=== NO_MOVE_FILES MODE ==="
+          [ -f "$(extractPath)/application/entrypoint.sh" ] && dos2unix "$(extractPath)/application/entrypoint.sh"
+          [ -f "$(extractPath)/application/clientlibrary/install-optional.libs.sh" ] && dos2unix "$(extractPath)/application/clientlibrary/install-optional.libs.sh"
+
+        displayName: 'Prepare Files (no_move_files)'
+
+    #################################################
+    # Buildx - Build & Push Multi-Arch Images
+    #################################################
+
+    - bash: |
+
+        docker buildx rm boldreports-builder || true
+
+        echo "AMD64 IP : $(amd64_vm_private_ip)"
+        echo "ARM64 IP : $(arm64_vm_private_ip)"
+
+        docker buildx create \
+          --name boldreports-builder \
+          --driver remote \
+          tcp://$(amd64_vm_private_ip):1234
+
+        docker buildx create \
+          --append \
+          --name boldreports-builder \
+          --driver remote \
+          tcp://$(arm64_vm_private_ip):1234
+
+        docker buildx use boldreports-builder
+
+        docker buildx inspect --bootstrap
+
+        DEBIAN_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)"
+        EVAL_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)_eval"
+        IMAGES_TYPE="${{ parameters.imagesType }}"
+
+        cd "$(extractPath)"
+
+        echo "================================="
+        echo "Images Type : $IMAGES_TYPE"
+        echo "================================="
+
+        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+
+          echo "================================="
+          echo "Building Debian Image : $DEBIAN_IMAGE"
+          echo "================================="
+
+          docker buildx build \
+            --builder boldreports-builder \
+            --platform linux/amd64,linux/arm64 \
+            -t "$DEBIAN_IMAGE" \
+            -f boldreports-debian.txt \
+            --push .
+
+          echo "Debian Image Pushed Successfully"
+
+        fi
+
+        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+
+          echo "================================="
+          echo "Building Eval Image : $EVAL_IMAGE"
+          echo "================================="
+
+          docker buildx build \
+            --builder boldreports-builder \
+            --platform linux/amd64,linux/arm64 \
+            -t "$EVAL_IMAGE" \
+            -f debian_arm64_postgres.txt \
+            --push .
+
+          echo "Eval Image Pushed Successfully"
+
+        fi
+
+      displayName: Selfhost Buildx Multi-Arch Build
+
+    #################################################
+    # Cleanup
+    #################################################
+
+    - bash: |
+
+        docker buildx rm boldreports-builder || true
+        docker system prune -f || true
+
+      displayName: Cleanup
+      condition: always()
