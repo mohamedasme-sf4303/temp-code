@@ -25,6 +25,15 @@ parameters:
     - dev
     - production
 
+- name: imagesType
+  displayName: Images Type
+  type: string
+  default: eval
+  values:
+    - debian
+    - eval
+    - both
+
 stages:
 
 - stage: Build
@@ -40,7 +49,7 @@ stages:
     displayName: ARM64 IP + Wait For Image
 
     pool:
-      name: boldbi-sefl-host-arm64-vmss
+      name: boldbi-buildx-arm64-vmss-agent-pool
 
     steps:
 
@@ -79,10 +88,8 @@ stages:
         echo "Saving Variable: $VAR_NAME"
         echo "ARM64 IP: $ARM64_IP"
 
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
         az extension add --name azure-devops --yes
-        
+
         az pipelines variable-group variable create \
         --organization "$(ADO_ORG_URL)" \
         --project "$(ADO_PROJECT)" \
@@ -95,71 +102,87 @@ stages:
         AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
 
       displayName: Save ARM64 IP
-      
+
     #################################################
-    # Verify Multi-Arch Image
+    # Verify Multi-Arch Images
     #################################################
-    
+
     - bash: |
-    
+
         if [ "${{ parameters.environment }}" = "dev" ]; then
           REPO="syncfusion/dev-boldbi-docker"
         else
           REPO="syncfusion/boldbi"
         fi
-    
-        IMAGE="${REPO}:${{ parameters.imageTag }}_$(Build.BuildId)"
-    
+
+        TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
+        IMAGES_TYPE="${{ parameters.imagesType }}"
+
         echo "$(DOCKER_PASSWORD)" | docker login \
           -u "$(DOCKER_USERNAME)" \
           --password-stdin
-    
+
+        check_image() {
+
+          local IMAGE="$1"
+          local LABEL="$2"
+
+          for i in {1..30}
+          do
+
+            echo "[$LABEL] Attempt $i/30 : $IMAGE"
+
+            OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>/dev/null)
+
+            AMD64_FOUND=$(echo "$OUTPUT" | grep -c "linux/amd64")
+            ARM64_FOUND=$(echo "$OUTPUT" | grep -c "linux/arm64")
+
+            echo "[$LABEL] amd64 count : $AMD64_FOUND"
+            echo "[$LABEL] arm64 count : $ARM64_FOUND"
+
+            if [ "$AMD64_FOUND" -gt 0 ] && [ "$ARM64_FOUND" -gt 0 ]; then
+              echo "[$LABEL] SUCCESS: Multi-Arch Image Found : $IMAGE"
+              return 0
+            fi
+
+            echo "[$LABEL] Required architectures not available yet..."
+            sleep 60
+
+          done
+
+          echo "[$LABEL] ERROR: Multi-Arch Image Not Found : $IMAGE"
+          return 1
+
+        }
+
         echo "================================="
-        echo "Waiting for image: $IMAGE"
-        echo "Checking:"
+        echo "Images Type : $IMAGES_TYPE"
+        echo "Waiting for images:"
+        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          echo " - ${REPO}:${TAG}"
+        fi
+        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          echo " - ${REPO}:${TAG}_eval"
+        fi
+        echo "Checking architectures:"
         echo " - linux/amd64"
         echo " - linux/arm64"
         echo "================================="
-    
-        for i in {1..30}
-        do
-    
-          echo "Attempt $i/30"
-    
-          OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>/dev/null)
-    
-          AMD64_FOUND=$(echo "$OUTPUT" | grep -c "linux/amd64")
-          ARM64_FOUND=$(echo "$OUTPUT" | grep -c "linux/arm64")
-    
-          echo "amd64 count : $AMD64_FOUND"
-          echo "arm64 count : $ARM64_FOUND"
-    
-          if [ "$AMD64_FOUND" -gt 0 ] && [ "$ARM64_FOUND" -gt 0 ]; then
-    
-            echo ""
-            echo "================================="
-            echo "SUCCESS: Multi-Arch Image Found"
-            echo "Image: $IMAGE"
-            echo "linux/amd64 : OK"
-            echo "linux/arm64 : OK"
-            echo "================================="
-    
-            exit 0
-    
-          fi
-    
-          echo "Required architectures not available yet..."
-          sleep 60
-    
-        done
-    
+
+        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          check_image "${REPO}:${TAG}" "DEBIAN" || exit 1
+        fi
+
+        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+          check_image "${REPO}:${TAG}_eval" "EVAL" || exit 1
+        fi
+
         echo ""
         echo "================================="
-        echo "ERROR: Multi-Arch Image Not Found"
-        echo "Image: $IMAGE"
-        exit 1
-      displayName: Wait For Image
-   
+        echo "SUCCESS: Requested Multi-Arch Image(s) Found"
+        echo "================================="
+
+      displayName: Wait For Images
 
   ####################################################################
   # AMD64 JOB
@@ -170,7 +193,7 @@ stages:
     displayName: Build Docker Image
 
     pool:
-      name: boldbi-sefl-host-amd64-vmss
+      name: boldbi-buildx-amd64-vmss-agent-pool
 
     steps:
 
@@ -181,8 +204,6 @@ stages:
     - bash: |
 
         VAR_NAME="ARM64_IP_$(Build.BuildId)"
-        sudo apt-get update
-        sudo apt-get install -y jq
         az devops configure \
           --defaults \
           organization="$(ADO_ORG_URL)" \
@@ -262,14 +283,6 @@ stages:
 
     - bash: |
 
-        sudo apt-get update
-
-        sudo apt-get install -y \
-          ca-certificates \
-          curl \
-          zip \
-          jq
-
         wget "${{ parameters.boldbiPackage }}"
 
         unzip BoldBI*.zip
@@ -344,15 +357,49 @@ stages:
 
         docker buildx inspect --bootstrap
 
-        IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)"
+        DEBIAN_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)"
+        EVAL_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)_eval"
+        IMAGES_TYPE="${{ parameters.imagesType }}"
 
         cd BoldBIServer-Linux
 
-        docker buildx build \
-          --builder boldbi-builder \
-          --platform linux/amd64,linux/arm64 \
-          -t "$IMAGE" \
-          -f boldbi-manifets.txt \
-          --push .
+        echo "================================="
+        echo "Images Type : $IMAGES_TYPE"
+        echo "================================="
+
+        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+
+          echo "================================="
+          echo "Building Debian Image : $DEBIAN_IMAGE"
+          echo "================================="
+
+          docker buildx build \
+            --builder boldbi-builder \
+            --platform linux/amd64,linux/arm64 \
+            -t "$DEBIAN_IMAGE" \
+            -f boldbi-manifets.txt \
+            --push .
+
+          echo "Debian Image Pushed Successfully"
+
+        fi
+
+        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+
+          echo "================================="
+          echo "Building Eval Image : $EVAL_IMAGE"
+          echo "================================="
+
+          docker buildx build \
+            --builder boldbi-builder \
+            --platform linux/amd64,linux/arm64 \
+            -t "$EVAL_IMAGE" \
+            --build-arg INSTALL_POSTGRES=true \
+            -f boldbi-manifets.txt \
+            --push .
+
+          echo "Eval Image Pushed Successfully"
+
+        fi
 
       displayName: Selfhost Buildx
