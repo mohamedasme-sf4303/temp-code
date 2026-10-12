@@ -405,6 +405,12 @@ stages:
         branch: '${{ parameters.utility_branch_name }}'
       displayName: 'Checkout bold-reports-utilities'
 
+    - task: Syncfusion Gitea Checkout@1
+      inputs:
+        giteaUrl: 'https://gitea.syncfusion.com/bold-reports/bold-reports-utilities'
+        branch: '${{ parameters.utility_branch_name }}'
+      displayName: 'Checkout bold-reports-utilities'
+
     - bash: |
         cd "$(Build.SourcesDirectory)"
         wget '${{ parameters.linux_package }}'
