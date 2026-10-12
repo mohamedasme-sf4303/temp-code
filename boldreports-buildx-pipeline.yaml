@@ -1,9 +1,9 @@
 trigger: none
 
 variables:
-  ADO_ORG_URL: https://dev.azure.com/bold-bi
-  ADO_PROJECT: build
-  VARIABLE_GROUP_ID: 70
+  ADO_ORG_URL: https://dev.azure.com/bold-reports
+  ADO_PROJECT: Bold Reports
+  VARIABLE_GROUP_ID: 21
 
 parameters:
 
@@ -62,7 +62,7 @@ stages:
     displayName: ARM64 IP + Wait For Image
 
     pool:
-      name: boldreports-docker-image-vmss-agent-pool-arm64
+      name: boldreports-buildx-arm64-vmss-agent-pool
 
     steps:
 
@@ -206,7 +206,7 @@ stages:
     displayName: Build Docker Image
 
     pool:
-      name: boldreports_docker_image_vmss_agent_pool
+      name: boldreports-buildx-amd64-vmss-agent-pool
 
     steps:
 
