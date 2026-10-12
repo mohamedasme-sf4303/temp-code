@@ -120,6 +120,13 @@ stages:
     # Verify Multi-Arch Images
     #################################################
 
+    - task: Docker@2
+      displayName: 'Docker Login'
+      inputs:
+        containerRegistry: 'dockerhub-CI'
+        command: 'login'
+
+
     - bash: |
 
         if [ "${{ parameters.environment }}" = "dev" ]; then
@@ -130,10 +137,6 @@ stages:
 
         TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
         IMAGES_TYPE="${{ parameters.imagesType }}"
-
-        echo "$(DOCKER_PASSWORD)" | docker login \
-          -u "$(DOCKER_USERNAME)" \
-          --password-stdin
 
         check_image() {
 
