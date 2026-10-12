@@ -487,7 +487,7 @@ stages:
             --builder boldreports-builder \
             --platform linux/amd64,linux/arm64 \
             -t "$DEBIAN_IMAGE" \
-            -f boldreports-debian.txt \
+            -f boldreports-manifest.txt \
             --push .
 
           echo "Debian Image Pushed Successfully"
@@ -504,7 +504,7 @@ stages:
             --builder boldreports-builder \
             --platform linux/amd64,linux/arm64 \
             -t "$EVAL_IMAGE" \
-            -f debian_arm64_postgres.txt \
+            -f boldreports-manifest.txt \
             --push .
 
           echo "Eval Image Pushed Successfully"
