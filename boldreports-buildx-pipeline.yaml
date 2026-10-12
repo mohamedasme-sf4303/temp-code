@@ -614,7 +614,7 @@ stages:
 
     - bash: |
         IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -631,7 +631,7 @@ stages:
 
     - bash: |
         IDP_API_IMAGE="$(REPOSITORY)-idp-api:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -648,7 +648,7 @@ stages:
 
     - bash: |
         IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -665,7 +665,7 @@ stages:
 
     - bash: |
         REPORTS_WEB_IMAGE="$(REPOSITORY)reports-server:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -682,7 +682,7 @@ stages:
 
     - bash: |
         REPORTS_API_IMAGE="$(REPOSITORY)reports-server-api:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -699,7 +699,7 @@ stages:
 
     - bash: |
         REPORTS_JOBS_IMAGE="$(REPOSITORY)reports-server-jobs:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -716,7 +716,7 @@ stages:
 
     - bash: |
         REPORTS_DESIGNER_IMAGE="$(REPOSITORY)reports-designer:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -733,7 +733,7 @@ stages:
 
     - bash: |
         REPORTS_VIEWER_IMAGE="$(REPOSITORY)reports-viewer:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -750,7 +750,7 @@ stages:
 
     - bash: |
         ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
     
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -767,7 +767,7 @@ stages:
 
     - bash: |
         AI_IMAGE="$(REPOSITORY)-reports-ai:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
         
         docker buildx build \
           --builder boldreports-k8s-builder \
@@ -784,7 +784,7 @@ stages:
 
     - bash: |
         MCP_IMAGE="$(REPOSITORY)-reports-mcp:${{ parameters.imageTag }}"
-        cd $(TargetDir)
+        cd "$(TargetDir)"
         
         docker buildx build \
           --builder boldreports-k8s-builder \
