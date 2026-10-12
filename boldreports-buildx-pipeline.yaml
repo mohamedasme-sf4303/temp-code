@@ -7,45 +7,93 @@ variables:
 
 parameters:
 
-- name: imageTag
-  displayName: Docker Image Tag
-  type: string
-  default: latest
+  - name: imageTag
+    displayName: Docker Image Tag
+    type: string
+    default: latest
 
-- name: linux_package
-  displayName: 'Docker Linux Package URL'
-  type: string
-  default: ''
+  - name: linux_package
+    displayName: 'Docker Linux Package URL'
+    type: string
+    default: ''
 
-- name: environment
-  displayName: Environment
-  type: string
-  default: dev
-  values:
-    - dev
-    - production
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - production
 
-- name: imagesType
-  displayName: Images Type
-  type: string
-  default: eval
-  values:
-    - debian
-    - eval
-    - both
+  - name: utility_branch_name
+    displayName: 'Utility Branch Name'
+    type: string
+    default: 'development'
 
-- name: utility_branch_name
-  displayName: 'Utility Branch Name'
-  type: string
-  default: 'development'
+  - name: docker_files_version
+    displayName: 'Docker files version'
+    type: string
+    default: 'latest'
 
-- name: packageType
-  displayName: 'Package Type. Note: If you are using Bold Reports version 12.2 below with Docker packages, or if you are using Linux packages, you need to choose the move_files option.'
-  type: string
-  values:
-    - move_files
-    - no_move_files
-  default: move_files
+  - name: All
+    displayName: Build All Images
+    type: boolean
+    default: false
+
+  - name: ID_WEB
+    displayName: Build IDP Web (bold-identity)
+    type: boolean
+    default: false
+
+  - name: ID_API
+    displayName: Build IDP API (bold-idp-api)
+    type: boolean
+    default: false
+
+  - name: ID_UMS
+    displayName: Build IDP UMS (bold-ums)
+    type: boolean
+    default: false
+
+  - name: Reports_WEB
+    displayName: Build Reports Server (Web)
+    type: boolean
+    default: false
+
+  - name: Reports_API
+    displayName: Build Reports Server API
+    type: boolean
+    default: false
+
+  - name: Reports_JOBS
+    displayName: Build Reports Jobs
+    type: boolean
+    default: false
+
+  - name: Reports_REPORTSERVCE
+    displayName: Build Reports Designer
+    type: boolean
+    default: false
+
+  - name: Reports_VIEWER
+    displayName: Build Reports Viewer
+    type: boolean
+    default: false
+
+  - name: BOLD_ETL
+    displayName: Build BOLD ETL
+    type: boolean
+    default: false
+
+  - name: Reports_AI
+    displayName: Build Reports AI
+    type: boolean
+    default: false
+
+  - name: Reports_MCP
+    displayName: Build Reports MCP
+    type: boolean
+    default: false
 
 stages:
 
@@ -59,7 +107,7 @@ stages:
 
   - job: Arm64Job
 
-    displayName: ARM64 IP + Wait For Image
+    displayName: ARM64 IP + Wait For Images
 
     pool:
       name: boldreports-buildx-arm64-vmss-agent-pool
@@ -71,8 +119,7 @@ stages:
     #################################################
 
     - bash: |
-
-        TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
+        TAG="${{ parameters.imageTag }}"
 
         if [[ ! "$TAG" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
           echo "Invalid Docker image tag: $TAG"
@@ -80,8 +127,7 @@ stages:
         fi
 
         echo "Image tag validation successful"
-
-      displayName: Validate Tag
+      displayName: Validate image tag
 
     #################################################
     # Save ARM64 IP
@@ -96,7 +142,7 @@ stages:
           exit 1
         fi
 
-        VAR_NAME="BOLDREPORTS_ARM64_IP_$(Build.BuildId)"
+        VAR_NAME="BOLDREPORTS_K8S_ARM64_IP_$(Build.BuildId)"
 
         echo "Saving Variable: $VAR_NAME"
         echo "ARM64 IP: $ARM64_IP"
@@ -117,7 +163,7 @@ stages:
       displayName: Save ARM64 IP
 
     #################################################
-    # Verify Multi-Arch Images
+    # Wait For Images (Multi-Arch Verification)
     #################################################
 
     - task: Docker@2
@@ -126,77 +172,115 @@ stages:
         containerRegistry: 'dockerhub-CI'
         command: 'login'
 
-
     - bash: |
 
         if [ "${{ parameters.environment }}" = "dev" ]; then
-          REPO="syncfusion/dev-boldreports-docker"
+          REPO="syncfusion/dev-bold"
         else
-          REPO="syncfusion/boldreports"
+          REPO="syncfusion/bold"
         fi
 
-        TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
-        IMAGES_TYPE="${{ parameters.imagesType }}"
+        # echo "$(DOCKER_PASSWORD)" | docker login \
+        #   -u "$(DOCKER_USERNAME)" \
+        #   --password-stdin
 
-        check_image() {
+        IMAGES=()
 
-          local IMAGE="$1"
-          local LABEL="$2"
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.ID_WEB }}" = "True" ]; then
+          IMAGES+=("${REPO}-identity:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.ID_API }}" = "True" ]; then
+          IMAGES+=("${REPO}-idp-api:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.ID_UMS }}" = "True" ]; then
+          IMAGES+=("${REPO}-ums:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_WEB }}" = "True" ]; then
+          IMAGES+=("${REPO}reports-server:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_API }}" = "True" ]; then
+          IMAGES+=("${REPO}reports-server-api:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_JOBS }}" = "True" ]; then
+          IMAGES+=("${REPO}reports-server-jobs:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_REPORTSERVCE }}" = "True" ]; then
+          IMAGES+=("${REPO}reports-designer:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_VIEWER }}" = "True" ]; then
+          IMAGES+=("${REPO}reports-viewer:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.BOLD_ETL }}" = "True" ]; then
+          IMAGES+=("${REPO}-etl:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_AI }}" = "True" ]; then
+          IMAGES+=("${REPO}-reports-ai:${{ parameters.imageTag }}")
+        fi
+        if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_MCP }}" = "True" ]; then
+          IMAGES+=("${REPO}-reports-mcp:${{ parameters.imageTag }}")
+        fi
+        if [ ${#IMAGES[@]} -eq 0 ]; then
+          echo "No images selected to build. Nothing to verify."
+          exit 0
+        fi
 
-          for i in {1..30}
-          do
+        echo "================================="
+        echo "Waiting for images:"
+        for IMG in "${IMAGES[@]}"; do
+          echo " - $IMG"
+        done
+        echo "================================="
 
-            echo "[$LABEL] Attempt $i/30 : $IMAGE"
+        PENDING=("${IMAGES[@]}")
 
-            OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>/dev/null)
+        for i in {1..40}
+        do
+
+          echo "Attempt $i/40"
+
+          STILL_PENDING=()
+
+          for IMG in "${PENDING[@]}"; do
+
+            OUTPUT=$(docker buildx imagetools inspect "$IMG" 2>/dev/null)
 
             AMD64_FOUND=$(echo "$OUTPUT" | grep -c "linux/amd64")
             ARM64_FOUND=$(echo "$OUTPUT" | grep -c "linux/arm64")
 
-            echo "[$LABEL] amd64 count : $AMD64_FOUND"
-            echo "[$LABEL] arm64 count : $ARM64_FOUND"
-
             if [ "$AMD64_FOUND" -gt 0 ] && [ "$ARM64_FOUND" -gt 0 ]; then
-              echo "[$LABEL] SUCCESS: Multi-Arch Image Found : $IMAGE"
-              return 0
+              echo "SUCCESS: Multi-Arch Image Found -> $IMG"
+            else
+              STILL_PENDING+=("$IMG")
             fi
-
-            echo "[$LABEL] Required architectures not available yet..."
-            sleep 60
 
           done
 
-          echo "[$LABEL] ERROR: Multi-Arch Image Not Found : $IMAGE"
-          return 1
+          PENDING=("${STILL_PENDING[@]}")
 
-        }
+          if [ ${#PENDING[@]} -eq 0 ]; then
+            echo ""
+            echo "================================="
+            echo "SUCCESS: All Multi-Arch Images Found"
+            echo "================================="
+            exit 0
+          fi
 
-        echo "================================="
-        echo "Images Type : $IMAGES_TYPE"
-        echo "Waiting for images:"
-        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
-          echo " - ${REPO}:${TAG}"
-        fi
-        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
-          echo " - ${REPO}:${TAG}_eval"
-        fi
-        echo "Checking architectures:"
-        echo " - linux/amd64"
-        echo " - linux/arm64"
-        echo "================================="
+          echo "Still waiting for:"
+          for IMG in "${PENDING[@]}"; do
+            echo " - $IMG"
+          done
 
-        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
-          check_image "${REPO}:${TAG}" "DEBIAN" || exit 1
-        fi
+          sleep 60
 
-        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
-          check_image "${REPO}:${TAG}_eval" "EVAL" || exit 1
-        fi
+        done
 
         echo ""
         echo "================================="
-        echo "SUCCESS: Requested Multi-Arch Image(s) Found"
-        echo "================================="
+        echo "ERROR: Multi-Arch Images Not Found"
+        for IMG in "${PENDING[@]}"; do
+          echo " - $IMG"
+        done
+        exit 1
 
       displayName: Wait For Images
 
@@ -205,13 +289,46 @@ stages:
   ####################################################################
 
   - job: DockerBuild
-
-    displayName: Build Docker Image
+    workspace:
+      clean: all
+    displayName: Build Docker Images
 
     pool:
       name: boldreports-buildx-amd64-vmss-agent-pool
 
     steps:
+    - checkout: none
+
+    #################################################
+    # Validate Tag
+    #################################################
+
+    - bash: |
+        TAG="${{ parameters.imageTag }}"
+
+        if [[ ! "$TAG" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
+          echo "Invalid Docker image tag: $TAG"
+          exit 1
+        fi
+
+        echo "Image tag validation successful"
+      displayName: Validate image tag
+
+    #################################################
+    # Repository Selection
+    #################################################
+
+    - bash: |
+
+        if [ "${{ parameters.environment }}" = "dev" ]; then
+          REPO="syncfusion/dev-bold"
+        else
+          REPO="syncfusion/bold"
+        fi
+
+        echo "##vso[task.setvariable variable=REPOSITORY]$REPO"
+
+      displayName: Set Docker Repository
 
     #################################################
     # Wait for ARM64 IP
@@ -219,7 +336,8 @@ stages:
 
     - bash: |
 
-        VAR_NAME="BOLDREPORTS_ARM64_IP_$(Build.BuildId)"
+        VAR_NAME="BOLDREPORTS_K8S_ARM64_IP_$(Build.BuildId)"
+
         az devops configure \
           --defaults \
           organization="$(ADO_ORG_URL)" \
@@ -278,57 +396,172 @@ stages:
       displayName: Get AMD64 VM IP
 
     #################################################
-    # Repository Selection
+    # Download Package & Clone Utilities
     #################################################
+
+    - task: Syncfusion Gitea Checkout@1
+      inputs:
+        giteaUrl: 'https://gitea.syncfusion.com/bold-reports/bold-reports-utilities'
+        branch: '${{ parameters.utility_branch_name }}'
+      displayName: 'Checkout bold-reports-utilities'
 
     - bash: |
+        sudo wget "${{ parameters.linux_package }}"
+        sudo apt-get update
+        sudo apt-get install -y unzip
+        sudo unzip BoldReports*.zip
+        WORK_DIR="$(System.DefaultWorkingDirectory)"
+        if [ -d "$WORK_DIR/BoldReportsServer-Linux" ]; then
+            TARGET_DIR="$WORK_DIR/BoldReportsServer-Linux"
+            echo "##vso[task.setvariable variable=extractPath]$TARGET_DIR"
 
-        if [ "${{ parameters.environment }}" = "dev" ]; then
-          REPO="syncfusion/dev-boldreports-docker"
+        elif [ -d "$WORK_DIR/BoldReports_EnterpriseReporting-Linux" ]; then
+            TARGET_DIR="$WORK_DIR/BoldReports_EnterpriseReporting-Linux"
+            echo "##vso[task.setvariable variable=extractPath]$TARGET_DIR"
+
         else
-          REPO="syncfusion/boldreports"
-        fi
-
-        echo "##vso[task.setvariable variable=REPOSITORY]$REPO"
-
-      displayName: Set Docker Repository
-
-    #################################################
-    # Download Package & Utilities
-    #################################################
-
-    - bash: |
-
-        cd "$(Build.SourcesDirectory)"
-        sudo rm -rf *
-        wget "${{ parameters.linux_package }}"
-        unzip BoldReports*.zip
-        rm -f BoldReports*.zip
-
-        # Detect package folder
-        if [ -d "$(Build.SourcesDirectory)/BoldReportsServer-Linux" ]; then
-            EXTRACT_PATH="$(Build.SourcesDirectory)/BoldReportsServer-Linux"
-        elif [ -d "$(Build.SourcesDirectory)/BoldReports_EnterpriseReporting-Linux" ]; then
-            EXTRACT_PATH="$(Build.SourcesDirectory)/BoldReports_EnterpriseReporting-Linux"
-        else
-            echo "ERROR: Bold Reports package folder not found."
+            echo "ERROR: Extracted package folder not found."
             exit 1
         fi
 
-        echo "##vso[task.setvariable variable=extractPath]$EXTRACT_PATH"
+        echo "Using TAG: ${{ parameters.imageTag }}"
 
-      displayName: Download & Extract Package
+        sudo rm -f BoldReports*.zip
 
-    #################################################
-    # Clone Bold Reports Utilities (if move_files)
-    #################################################
+        # # Create directories for K8s services
+        # echo "Creating directories for K8s services..."
+        # sudo mkdir -p $TARGET_DIR/application/reporting/web/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/reporting/api/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/reporting/jobs/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/reporting/reportservice/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/reporting/viewer/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/idp/web/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/idp/api/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/idp/ums/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/etl/etlservice/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/ai/reportsaiservice/appdatafiles
+        # sudo mkdir -p $TARGET_DIR/application/ai/reportsmcpservice/appdatafiles
 
-    - ${{ if eq(parameters.packageType, 'move_files') }}:
-      - task: Syncfusion Gitea Checkout@1
-        inputs:
-          giteaUrl: 'https://gitea.syncfusion.com/bold-reports/bold-reports-utilities'
-          branch: '${{ parameters.utility_branch_name }}'
-        displayName: 'Clone Bold Reports Utilities'
+      displayName: 'Download & Unzip Linux Package'
+
+    - bash: |
+        echo "======================================================"
+        echo "STEP 1 : Preparing Files for K8s"
+        echo "======================================================"
+        WORK_DIR="$(System.DefaultWorkingDirectory)"
+        TARGET_DIR="$(extractPath)"
+        DOCKER_DIR="$WORK_DIR/bold-reports-utilities/build/dockerfiles/${{ parameters.docker_files_version }}"
+        SCRIPT_BASE="$WORK_DIR/bold-reports-utilities/movesharedfiles/MoveSharedFiles/shell_scripts"
+
+        # --------------------------------------------------------------------------
+        # Copy entrypoint scripts
+        # --------------------------------------------------------------------------
+        echo ""
+        echo "======================================================"
+        echo "STEP 2 : Copy Entrypoint Scripts"
+        echo "======================================================"
+        
+        declare -A ENTRYPOINTS=(
+            ["web"]="$TARGET_DIR/application/reporting/web"
+            ["api"]="$TARGET_DIR/application/reporting/api"
+            ["jobs"]="$TARGET_DIR/application/reporting/jobs"
+            ["designer"]="$TARGET_DIR/application/reporting/reportservice"
+            ["viewer"]="$TARGET_DIR/application/reporting/viewer"
+            ["id_web"]="$TARGET_DIR/application/idp/web"
+            ["id_ums"]="$TARGET_DIR/application/idp/ums"
+            ["id_api"]="$TARGET_DIR/application/idp/api"
+            ["etl"]="$TARGET_DIR/application/etl/etlservice"
+            ["ai"]="$TARGET_DIR/application/ai/reportsaiservice"
+            ["mcp"]="$TARGET_DIR/application/ai/reportsmcpservice"
+        )
+
+        for src in "${!ENTRYPOINTS[@]}"; do
+            if [ -f "$SCRIPT_BASE/$src/entrypoint.sh" ]; then
+              sudo cp "$SCRIPT_BASE/$src/entrypoint.sh" "${ENTRYPOINTS[$src]}/"
+              echo "$SCRIPT_BASE/$src/entrypoint.sh file moved"
+            else
+              echo "$SCRIPT_BASE/$src/entrypoint.sh file not found"
+            fi
+        done
+
+        # --------------------------------------------------------------------------
+        # Extract client libraries
+        # --------------------------------------------------------------------------
+        echo ""
+        echo "======================================================"
+        echo "STEP 3 : Extract Client Libraries"
+        echo "======================================================"
+        CLIENT_DIR="$TARGET_DIR/clientlibrary/boldreports"
+        TEMP_DIR="$CLIENT_DIR/temp_dir"
+        sudo mkdir -p "$TEMP_DIR"
+        sudo unzip -q "$CLIENT_DIR/clientlibraries.zip" -d "$TEMP_DIR"
+        sudo cp -rf $TEMP_DIR/* "$WORK_DIR/bold-reports-utilities/installscripts/single-docker-image/clientlibrary/MoveSharedFiles/app_data/optional-libs/boldreports/clientlibraries/" || true
+        echo "SUCCESS : Client Libraries Copied"
+
+        # --------------------------------------------------------------------------
+        # Copy MoveSharedFiles
+        # --------------------------------------------------------------------------
+        echo ""
+        echo "======================================================"
+        echo "STEP 4 : Copy MoveSharedFiles"
+        echo "======================================================"
+        APPDATA_DIR="$TARGET_DIR/application/idp/web/appdatafiles"
+        sudo mkdir -p "$APPDATA_DIR"
+        sudo cp -r \
+            "$WORK_DIR/bold-reports-utilities/installscripts/single-docker-image/clientlibrary/MoveSharedFiles" \
+            "$APPDATA_DIR/"
+        PRODUCT_JSON="$TARGET_DIR/application/app_data/configuration/product.json"
+        sudo cp "$PRODUCT_JSON" "$APPDATA_DIR/MoveSharedFiles/app_data/configuration/" || true
+        sudo cp "$PRODUCT_JSON" "$TARGET_DIR/application/idp/api/" || true
+        sudo cp "$PRODUCT_JSON" "$TARGET_DIR/application/idp/ums/" || true
+        echo "MoveSharedFiles Copied"
+
+        # --------------------------------------------------------------------------
+        # Copy optional libraries
+        # --------------------------------------------------------------------------
+        echo ""
+        echo "======================================================"
+        echo "STEP 5 : Copy Optional Libraries"
+        echo "======================================================"
+        OPTIONAL_LIB_SRC="$APPDATA_DIR/MoveSharedFiles/app_data/optional-libs"
+        SERVICES=(
+            api
+            jobs
+            viewer
+            reportservice
+            web
+        )
+        for service in "${SERVICES[@]}"; do
+            DEST="$TARGET_DIR/application/reporting/$service/optional-libs"
+            sudo mkdir -p "$DEST"
+            sudo cp -r "$OPTIONAL_LIB_SRC/." "$DEST/" || true
+        done
+
+        # --------------------------------------------------------------------------
+        # Copy and rename Dockerfiles
+        # --------------------------------------------------------------------------
+        echo ""
+        echo "======================================================"
+        echo "STEP 6 : Prepare Dockerfiles"
+        echo "======================================================"
+        MANIFEST_DIR="$DOCKER_DIR/kubernetes"
+
+        if [ -d "$MANIFEST_DIR" ]; then
+          for txtFile in "$MANIFEST_DIR"/*.txt; do
+            [ -f "$txtFile" ] || continue
+            filename=$(basename "$txtFile")
+            imageName=$(echo "$filename" | sed 's/^boldreports-//' | sed 's/\.txt$//')
+            sudo cp "$txtFile" "$TARGET_DIR/${imageName}-manifest.Dockerfile"
+            echo "Copied: ${imageName}-manifest.Dockerfile"
+          done
+        fi
+
+        echo ""
+        echo "======================================================"
+        echo "FILE PREPARATION COMPLETED SUCCESSFULLY"
+        echo "======================================================"
+        
+      displayName: 'Prepare Application and Dockerfiles'
 
     #################################################
     # Docker Login
@@ -367,161 +600,226 @@ stages:
       displayName: Wait For BuildKit
 
     #################################################
-    # Prepare Files (move_files mode)
-    #################################################
-
-    - ${{ if eq(parameters.packageType, 'move_files') }}:
-      - bash: |
-
-          utilityBasePath="$(Build.SourcesDirectory)/bold-reports-utilities/build/dockerfiles/latest/single-docker-image"
-
-          echo "=== MOVE_FILES MODE ==="
-          echo "Utility base path: $utilityBasePath"
-          ls -R "$utilityBasePath/" || true
-
-          # Get version
-          if [ -f "$(extractPath)/application/app_data/configuration/product.json" ]; then
-              configFilePath="$(extractPath)/application/app_data/configuration/product.json"
-          elif [ -f "$(extractPath)/application/product.json" ]; then
-              configFilePath="$(extractPath)/application/product.json"
-          else
-              echo "##[error]product.json not found"
-              exit 1
-          fi
-
-          version=$(jq -r '.BoldProducts[0].Version' "$configFilePath")
-          idpVersion=$(jq -r '.BoldProducts[0].IDPVersion' "$configFilePath")
-          echo "Version: $version | IDPVersion: $idpVersion"
-
-          # Update utility product.json
-          if [ -f "$utilityBasePath/product.json" ]; then
-            sed -i "s|\"Version\": *\"[^\"]*\"|\"Version\": \"$version\"|g" "$utilityBasePath/product.json"
-            sed -i "s|\"IDPVersion\": *\"[^\"]*\"|\"IDPVersion\": \"$idpVersion\"|g" "$utilityBasePath/product.json"
-          fi
-
-          # Copy main Dockerfiles
-          echo "Copying Dockerfiles..."
-          cp -v "$utilityBasePath/dockerfiles/"* "$(extractPath)/" || true
-
-          # Copy other files
-          cp -rv "$utilityBasePath/boldreports-nginx-config" "$(extractPath)/application/" || true
-          cp -v "$utilityBasePath/entrypoint.sh" "$(extractPath)/application/" || true
-          cp -v "$utilityBasePath/product.json" "$(extractPath)/application/" || true
-          cp -rv "$utilityBasePath/clientlibrary" "$(extractPath)/application/" || true
-
-          # Unzip client libraries
-          if [ -f "$(extractPath)/application/clientlibrary/boldreports/clientlibraries.zip" ]; then
-            cd "$(extractPath)/application/clientlibrary/boldreports/"
-            unzip -o clientlibraries.zip -d "$(extractPath)/application/clientlibrary/clientlibraries/"
-          fi
-
-          # MoveSharedFiles
-          mkdir -p "$(extractPath)/application/clientlibrary/MoveSharedFiles/app_data/configuration"
-          cp -v "$(extractPath)/application/product.json" "$(extractPath)/application/clientlibrary/MoveSharedFiles/app_data/configuration/"
-
-          cp -r "$(extractPath)/application/clientlibrary/"* "$(extractPath)/application/utilities/" || true
-
-          mkdir -p "$(extractPath)/application/idp/web/appdatafiles"
-          cp -r "$(extractPath)/application/clientlibrary/MoveSharedFiles" "$(extractPath)/application/idp/web/appdatafiles/"
-          rm -rf "$(extractPath)/application/app_data"
-
-          # Line endings
-          dos2unix "$(extractPath)/application/entrypoint.sh" || true
-          dos2unix "$(extractPath)/application/clientlibrary/install-optional.libs.sh" || true
-
-          echo "=== Files prepared for buildx ==="
-
-        displayName: 'Prepare Files (move_files)'
-
-    - ${{ else }}:
-      - bash: |
-
-          echo "=== NO_MOVE_FILES MODE ==="
-          [ -f "$(extractPath)/application/entrypoint.sh" ] && dos2unix "$(extractPath)/application/entrypoint.sh"
-          [ -f "$(extractPath)/application/clientlibrary/install-optional.libs.sh" ] && dos2unix "$(extractPath)/application/clientlibrary/install-optional.libs.sh"
-
-        displayName: 'Prepare Files (no_move_files)'
-
-    #################################################
-    # Buildx - Build & Push Multi-Arch Images
+    # Initialize Buildx Builder
     #################################################
 
     - bash: |
 
-        docker buildx rm boldreports-builder || true
+        docker buildx rm boldreports-k8s-builder || true
 
         echo "AMD64 IP : $(amd64_vm_private_ip)"
         echo "ARM64 IP : $(arm64_vm_private_ip)"
 
         docker buildx create \
-          --name boldreports-builder \
+          --name boldreports-k8s-builder \
           --driver remote \
           tcp://$(amd64_vm_private_ip):1234
 
         docker buildx create \
           --append \
-          --name boldreports-builder \
+          --name boldreports-k8s-builder \
           --driver remote \
           tcp://$(arm64_vm_private_ip):1234
 
-        docker buildx use boldreports-builder
+        docker buildx use boldreports-k8s-builder
 
         docker buildx inspect --bootstrap
 
-        DEBIAN_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)"
-        EVAL_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)_eval"
-        IMAGES_TYPE="${{ parameters.imagesType }}"
+      displayName: Initialize Buildx Builder
 
-        cd "$(extractPath)"
+    #################################################
+    # Build bold-identity
+    #################################################
 
-        echo "================================="
-        echo "Images Type : $IMAGES_TYPE"
-        echo "================================="
+    - bash: |
+        IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_WEB_IMAGE" \
+          -f identity-manifest.Dockerfile .
+      displayName: Build bold-identity
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.ID_WEB }}', true))
 
-        if [ "$IMAGES_TYPE" = "debian" ] || [ "$IMAGES_TYPE" = "both" ]; then
+    #################################################
+    # Build bold-idp-api
+    #################################################
 
-          echo "================================="
-          echo "Building Debian Image : $DEBIAN_IMAGE"
-          echo "================================="
+    - bash: |
+        IDP_API_IMAGE="$(REPOSITORY)-idp-api:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_API_IMAGE" \
+          -f idp-api-manifest.Dockerfile .
+      displayName: Build bold-idp-api
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.ID_API }}', true))
 
-          docker buildx build \
-            --builder boldreports-builder \
-            --platform linux/amd64,linux/arm64 \
-            -t "$DEBIAN_IMAGE" \
-            -f boldreports-manifest.txt \
-            --push .
+    #################################################
+    # Build bold-ums
+    #################################################
 
-          echo "Debian Image Pushed Successfully"
+    - bash: |
+        IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$IDP_UMS_IMAGE" \
+          -f ums-manifest.Dockerfile .
+      displayName: Build bold-ums
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.ID_UMS }}', true))
 
-        fi
+    #################################################
+    # Build boldreports-server
+    #################################################
 
-        if [ "$IMAGES_TYPE" = "eval" ] || [ "$IMAGES_TYPE" = "both" ]; then
+    - bash: |
+        REPORTS_WEB_IMAGE="$(REPOSITORY)reports-server:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$REPORTS_WEB_IMAGE" \
+          -f server-manifest.Dockerfile .
+      displayName: Build boldreports-server
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_WEB }}', true))
 
-          echo "================================="
-          echo "Building Eval Image : $EVAL_IMAGE"
-          echo "================================="
+    #################################################
+    # Build boldreports-server-api
+    #################################################
 
-          docker buildx build \
-            --builder boldreports-builder \
-            --platform linux/amd64,linux/arm64 \
-            -t "$EVAL_IMAGE" \
-            -f boldreports-manifest.txt \
-            --push .
+    - bash: |
+        REPORTS_API_IMAGE="$(REPOSITORY)reports-server-api:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$REPORTS_API_IMAGE" \
+          -f server-api-manifest.Dockerfile .
+      displayName: Build boldreports-server-api
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_API }}', true))
 
-          echo "Eval Image Pushed Successfully"
+    #################################################
+    # Build boldreports-server-jobs
+    #################################################
 
-        fi
+    - bash: |
+        REPORTS_JOBS_IMAGE="$(REPOSITORY)reports-server-jobs:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$REPORTS_JOBS_IMAGE" \
+          -f server-jobs-manifest.Dockerfile .
+      displayName: Build boldreports-server-jobs
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_JOBS }}', true))
 
-      displayName: Selfhost Buildx Multi-Arch Build
+    #################################################
+    # Build boldreports-designer
+    #################################################
+
+    - bash: |
+        REPORTS_DESIGNER_IMAGE="$(REPOSITORY)reports-designer:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$REPORTS_DESIGNER_IMAGE" \
+          -f designer-manifest.Dockerfile .
+      displayName: Build boldreports-designer
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_REPORTSERVCE }}', true))
+
+    #################################################
+    # Build boldreports-viewer
+    #################################################
+
+    - bash: |
+        REPORTS_VIEWER_IMAGE="$(REPOSITORY)reports-viewer:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$REPORTS_VIEWER_IMAGE" \
+          -f viewer-manifest.Dockerfile .
+      displayName: Build boldreports-viewer
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_VIEWER }}', true))
+
+    #################################################
+    # Build bold-etl
+    #################################################
+
+    - bash: |
+        ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
+        cd $(extractPath)
+    
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$ETL_IMAGE" \
+          -f etl-manifest.Dockerfile .
+      displayName: Build bold-etl
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.BOLD_ETL }}', true))
+
+    #################################################
+    # Build boldreports-ai
+    #################################################
+
+    - bash: |
+        AI_IMAGE="$(REPOSITORY)-reports-ai:${{ parameters.imageTag }}"
+        cd $(extractPath)
+        
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$AI_IMAGE" \
+          -f ai-manifest.Dockerfile .
+      displayName: Build boldreports-ai
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_AI }}', true))
+
+    #################################################
+    # Build boldreports-mcp
+    #################################################
+
+    - bash: |
+        MCP_IMAGE="$(REPOSITORY)-reports-mcp:${{ parameters.imageTag }}"
+        cd $(extractPath)
+        
+        docker buildx build \
+          --builder boldreports-k8s-builder \
+          --platform linux/amd64,linux/arm64 \
+          --push \
+          -t "$MCP_IMAGE" \
+          -f mcp-manifest.Dockerfile .
+      displayName: Build boldreports-mcp
+      condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_MCP }}', true))
 
     #################################################
     # Cleanup
     #################################################
 
     - bash: |
-
-        docker buildx rm boldreports-builder || true
+        docker buildx rm boldreports-k8s-builder || true
         docker system prune -f || true
-
       displayName: Cleanup
       condition: always()
