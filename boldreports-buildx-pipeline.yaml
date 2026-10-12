@@ -418,7 +418,7 @@ stages:
         echo "======================================================"
         echo "STEP 1 : Detecting Bold Reports Package"
         echo "======================================================"
-        ROOT_DIR="$(Build.SourcesDirectory)"
+        ROOT_DIR="$(System.DefaultWorkingDirectory)"
         if [ -d "$ROOT_DIR/BoldReportsServer-Linux" ]; then
             TARGET_DIR="$ROOT_DIR/BoldReportsServer-Linux"
             echo "##vso[task.setvariable variable=TargetDir]BoldReportsServer-Linux"
