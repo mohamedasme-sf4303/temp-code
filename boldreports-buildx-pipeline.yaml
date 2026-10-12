@@ -406,61 +406,54 @@ stages:
       displayName: 'Checkout bold-reports-utilities'
 
     - bash: |
-        sudo wget "${{ parameters.linux_package }}"
-        sudo apt-get update
+        cd "$(Build.SourcesDirectory)"
+        wget '${{ parameters.linux_package }}'
         sudo apt-get install -y unzip
         sudo unzip BoldReports*.zip
-        WORK_DIR="$(System.DefaultWorkingDirectory)"
-        if [ -d "$WORK_DIR/BoldReportsServer-Linux" ]; then
-            TARGET_DIR="$WORK_DIR/BoldReportsServer-Linux"
-            echo "##vso[task.setvariable variable=extractPath]$TARGET_DIR"
-
-        elif [ -d "$WORK_DIR/BoldReports_EnterpriseReporting-Linux" ]; then
-            TARGET_DIR="$WORK_DIR/BoldReports_EnterpriseReporting-Linux"
-            echo "##vso[task.setvariable variable=extractPath]$TARGET_DIR"
-
-        else
-            echo "ERROR: Extracted package folder not found."
-            exit 1
-        fi
-
-        echo "Using TAG: ${{ parameters.imageTag }}"
-
-        sudo rm -f BoldReports*.zip
-
-        # # Create directories for K8s services
-        # echo "Creating directories for K8s services..."
-        # sudo mkdir -p $TARGET_DIR/application/reporting/web/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/reporting/api/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/reporting/jobs/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/reporting/reportservice/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/reporting/viewer/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/idp/web/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/idp/api/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/idp/ums/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/etl/etlservice/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/ai/reportsaiservice/appdatafiles
-        # sudo mkdir -p $TARGET_DIR/application/ai/reportsmcpservice/appdatafiles
-
+        ls
+        rm BoldReports*.zip
       displayName: 'Download & Unzip Linux Package'
 
     - bash: |
         echo "======================================================"
-        echo "STEP 1 : Preparing Files for K8s"
+        echo "STEP 1 : Detecting Bold Reports Package"
         echo "======================================================"
-        WORK_DIR="$(System.DefaultWorkingDirectory)"
-        TARGET_DIR="$(extractPath)"
-        DOCKER_DIR="$WORK_DIR/bold-reports-utilities/build/dockerfiles/${{ parameters.docker_files_version }}"
-        SCRIPT_BASE="$WORK_DIR/bold-reports-utilities/movesharedfiles/MoveSharedFiles/shell_scripts"
+        ROOT_DIR="$(Build.SourcesDirectory)"
+        if [ -d "$ROOT_DIR/BoldReportsServer-Linux" ]; then
+            TARGET_DIR="$ROOT_DIR/BoldReportsServer-Linux"
+            echo "##vso[task.setvariable variable=TargetDir]BoldReportsServer-Linux"
+        elif [ -d "$ROOT_DIR/BoldReports_EnterpriseReporting-Linux" ]; then
+            TARGET_DIR="$ROOT_DIR/BoldReports_EnterpriseReporting-Linux"
+            echo "##vso[task.setvariable variable=TargetDir]BoldReports_EnterpriseReporting-Linux"
+        else
+            echo "ERROR: Bold Reports package folder not found."
+            exit 1
+        fi
+        echo "Starting file preparation..."
+        echo "Target Directory : $TARGET_DIR"
+
+        # --------------------------------------------------------------------------
+        # Copy docker files
+        # --------------------------------------------------------------------------
+        echo ""
+        echo "======================================================"
+        echo "STEP 2 : Copy Docker Files"
+        echo "======================================================"
+        DOCKER_DIR="$ROOT_DIR/bold-reports-utilities/build/dockerfiles/${{ parameters.docker_files_version }}"
+        sudo cp $DOCKER_DIR/bold* $TARGET_DIR/
+        echo ""
+        echo "Docker Files Present in Target Directory"
+        ls -ltr "$TARGET_DIR"
 
         # --------------------------------------------------------------------------
         # Copy entrypoint scripts
         # --------------------------------------------------------------------------
         echo ""
         echo "======================================================"
-        echo "STEP 2 : Copy Entrypoint Scripts"
+        echo "STEP 3 : Copy Entrypoint Scripts"
         echo "======================================================"
-        
+        SCRIPT_BASE="$ROOT_DIR/bold-reports-utilities/movesharedfiles/MoveSharedFiles/shell_scripts"
+
         declare -A ENTRYPOINTS=(
             ["web"]="$TARGET_DIR/application/reporting/web"
             ["api"]="$TARGET_DIR/application/reporting/api"
@@ -489,13 +482,13 @@ stages:
         # --------------------------------------------------------------------------
         echo ""
         echo "======================================================"
-        echo "STEP 3 : Extract Client Libraries"
+        echo "STEP 4 : Extract Client Libraries"
         echo "======================================================"
         CLIENT_DIR="$TARGET_DIR/clientlibrary/boldreports"
         TEMP_DIR="$CLIENT_DIR/temp_dir"
         sudo mkdir -p "$TEMP_DIR"
         sudo unzip -q "$CLIENT_DIR/clientlibraries.zip" -d "$TEMP_DIR"
-        sudo cp -rf $TEMP_DIR/* "$WORK_DIR/bold-reports-utilities/installscripts/single-docker-image/clientlibrary/MoveSharedFiles/app_data/optional-libs/boldreports/clientlibraries/" || true
+        sudo cp -rf $TEMP_DIR/* $ROOT_DIR/bold-reports-utilities/installscripts/single-docker-image/clientlibrary/MoveSharedFiles/app_data/optional-libs/boldreports/clientlibraries/
         echo "SUCCESS : Client Libraries Copied"
 
         # --------------------------------------------------------------------------
@@ -503,17 +496,18 @@ stages:
         # --------------------------------------------------------------------------
         echo ""
         echo "======================================================"
-        echo "STEP 4 : Copy MoveSharedFiles"
+        echo "STEP 5 : Copy MoveSharedFiles"
         echo "======================================================"
         APPDATA_DIR="$TARGET_DIR/application/idp/web/appdatafiles"
         sudo mkdir -p "$APPDATA_DIR"
         sudo cp -r \
-            "$WORK_DIR/bold-reports-utilities/installscripts/single-docker-image/clientlibrary/MoveSharedFiles" \
+            "$ROOT_DIR/bold-reports-utilities/installscripts/single-docker-image/clientlibrary/MoveSharedFiles" \
             "$APPDATA_DIR/"
         PRODUCT_JSON="$TARGET_DIR/application/app_data/configuration/product.json"
-        sudo cp "$PRODUCT_JSON" "$APPDATA_DIR/MoveSharedFiles/app_data/configuration/" || true
-        sudo cp "$PRODUCT_JSON" "$TARGET_DIR/application/idp/api/" || true
-        sudo cp "$PRODUCT_JSON" "$TARGET_DIR/application/idp/ums/" || true
+        sudo cp "$PRODUCT_JSON" \
+          "$APPDATA_DIR/MoveSharedFiles/app_data/configuration/"
+        sudo cp "$PRODUCT_JSON" "$TARGET_DIR/application/idp/api/"
+        sudo cp "$PRODUCT_JSON" "$TARGET_DIR/application/idp/ums/"
         echo "MoveSharedFiles Copied"
 
         # --------------------------------------------------------------------------
@@ -521,7 +515,7 @@ stages:
         # --------------------------------------------------------------------------
         echo ""
         echo "======================================================"
-        echo "STEP 5 : Copy Optional Libraries"
+        echo "STEP 6 : Copy Optional Libraries"
         echo "======================================================"
         OPTIONAL_LIB_SRC="$APPDATA_DIR/MoveSharedFiles/app_data/optional-libs"
         SERVICES=(
@@ -533,35 +527,16 @@ stages:
         )
         for service in "${SERVICES[@]}"; do
             DEST="$TARGET_DIR/application/reporting/$service/optional-libs"
+
             sudo mkdir -p "$DEST"
-            sudo cp -r "$OPTIONAL_LIB_SRC/." "$DEST/" || true
+            sudo cp -r "$OPTIONAL_LIB_SRC/." "$DEST/"
         done
-
-        # --------------------------------------------------------------------------
-        # Copy and rename Dockerfiles
-        # --------------------------------------------------------------------------
-        echo ""
-        echo "======================================================"
-        echo "STEP 6 : Prepare Dockerfiles"
-        echo "======================================================"
-        MANIFEST_DIR="$DOCKER_DIR/kubernetes"
-
-        if [ -d "$MANIFEST_DIR" ]; then
-          for txtFile in "$MANIFEST_DIR"/*.txt; do
-            [ -f "$txtFile" ] || continue
-            filename=$(basename "$txtFile")
-            imageName=$(echo "$filename" | sed 's/^boldreports-//' | sed 's/\.txt$//')
-            sudo cp "$txtFile" "$TARGET_DIR/${imageName}-manifest.Dockerfile"
-            echo "Copied: ${imageName}-manifest.Dockerfile"
-          done
-        fi
-
         echo ""
         echo "======================================================"
         echo "FILE PREPARATION COMPLETED SUCCESSFULLY"
         echo "======================================================"
-        
-      displayName: 'Prepare Application and Dockerfiles'
+
+      displayName: 'Copy Dockerfiles & Entrypoints'
 
     #################################################
     # Docker Login
@@ -633,14 +608,14 @@ stages:
 
     - bash: |
         IDP_WEB_IMAGE="$(REPOSITORY)-identity:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_WEB_IMAGE" \
-          -f identity-manifest.Dockerfile .
+          -f bold-identity-manifest.txt .
       displayName: Build bold-identity
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.ID_WEB }}', true))
 
@@ -650,14 +625,14 @@ stages:
 
     - bash: |
         IDP_API_IMAGE="$(REPOSITORY)-idp-api:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_API_IMAGE" \
-          -f idp-api-manifest.Dockerfile .
+          -f bold-idp-api-manifest.txt .
       displayName: Build bold-idp-api
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.ID_API }}', true))
 
@@ -667,14 +642,14 @@ stages:
 
     - bash: |
         IDP_UMS_IMAGE="$(REPOSITORY)-ums:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$IDP_UMS_IMAGE" \
-          -f ums-manifest.Dockerfile .
+          -f bold-ums-manifest.txt .
       displayName: Build bold-ums
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.ID_UMS }}', true))
 
@@ -684,14 +659,14 @@ stages:
 
     - bash: |
         REPORTS_WEB_IMAGE="$(REPOSITORY)reports-server:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$REPORTS_WEB_IMAGE" \
-          -f server-manifest.Dockerfile .
+          -f boldreports-server-manifest.txt .
       displayName: Build boldreports-server
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_WEB }}', true))
 
@@ -701,14 +676,14 @@ stages:
 
     - bash: |
         REPORTS_API_IMAGE="$(REPOSITORY)reports-server-api:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$REPORTS_API_IMAGE" \
-          -f server-api-manifest.Dockerfile .
+          -f boldreports-server-api-manifest.txt .
       displayName: Build boldreports-server-api
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_API }}', true))
 
@@ -718,14 +693,14 @@ stages:
 
     - bash: |
         REPORTS_JOBS_IMAGE="$(REPOSITORY)reports-server-jobs:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$REPORTS_JOBS_IMAGE" \
-          -f server-jobs-manifest.Dockerfile .
+          -f boldreports-server-jobs-manifest.txt .
       displayName: Build boldreports-server-jobs
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_JOBS }}', true))
 
@@ -735,14 +710,14 @@ stages:
 
     - bash: |
         REPORTS_DESIGNER_IMAGE="$(REPOSITORY)reports-designer:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$REPORTS_DESIGNER_IMAGE" \
-          -f designer-manifest.Dockerfile .
+          -f boldreports-designer-manifest.txt .
       displayName: Build boldreports-designer
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_REPORTSERVCE }}', true))
 
@@ -752,14 +727,14 @@ stages:
 
     - bash: |
         REPORTS_VIEWER_IMAGE="$(REPOSITORY)reports-viewer:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$REPORTS_VIEWER_IMAGE" \
-          -f viewer-manifest.Dockerfile .
+          -f boldreports-server-viewer-manifest.txt .
       displayName: Build boldreports-viewer
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_VIEWER }}', true))
 
@@ -769,14 +744,14 @@ stages:
 
     - bash: |
         ETL_IMAGE="$(REPOSITORY)-etl:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
     
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$ETL_IMAGE" \
-          -f etl-manifest.Dockerfile .
+          -f bold-etl-manifest.txt .
       displayName: Build bold-etl
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.BOLD_ETL }}', true))
 
@@ -786,14 +761,14 @@ stages:
 
     - bash: |
         AI_IMAGE="$(REPOSITORY)-reports-ai:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
         
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$AI_IMAGE" \
-          -f ai-manifest.Dockerfile .
+          -f boldreports-ai-manifest.txt .
       displayName: Build boldreports-ai
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_AI }}', true))
 
@@ -803,14 +778,14 @@ stages:
 
     - bash: |
         MCP_IMAGE="$(REPOSITORY)-reports-mcp:${{ parameters.imageTag }}"
-        cd $(extractPath)
+        cd $(TargetDir)
         
         docker buildx build \
           --builder boldreports-k8s-builder \
           --platform linux/amd64,linux/arm64 \
           --push \
           -t "$MCP_IMAGE" \
-          -f mcp-manifest.Dockerfile .
+          -f boldreports-mcp-manifest.txt .
       displayName: Build boldreports-mcp
       condition: or(eq('${{ parameters.All }}', true), eq('${{ parameters.Reports_MCP }}', true))
 
