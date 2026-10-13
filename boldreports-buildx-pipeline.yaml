@@ -214,10 +214,10 @@ stages:
           IMAGES+=("${REPO}-etl:${{ parameters.imageTag }}")
         fi
         if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_AI }}" = "True" ]; then
-          IMAGES+=("${REPO}-reports-ai:${{ parameters.imageTag }}")
+          IMAGES+=("${REPO}reports-ai:${{ parameters.imageTag }}")
         fi
         if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.Reports_MCP }}" = "True" ]; then
-          IMAGES+=("${REPO}-reports-mcp:${{ parameters.imageTag }}")
+          IMAGES+=("${REPO}reports-mcp-server:${{ parameters.imageTag }}")
         fi
         if [ ${#IMAGES[@]} -eq 0 ]; then
           echo "No images selected to build. Nothing to verify."
@@ -766,7 +766,7 @@ stages:
     #################################################
 
     - bash: |
-        AI_IMAGE="$(REPOSITORY)-reports-ai:${{ parameters.imageTag }}"
+        AI_IMAGE="$(REPOSITORY)reports-ai:${{ parameters.imageTag }}"
         cd "$(TargetDir)"
         
         docker buildx build \
@@ -783,7 +783,7 @@ stages:
     #################################################
 
     - bash: |
-        MCP_IMAGE="$(REPOSITORY)-reports-mcp:${{ parameters.imageTag }}"
+        MCP_IMAGE="$(REPOSITORY)reports-mcp-server:${{ parameters.imageTag }}"
         cd "$(TargetDir)"
         
         docker buildx build \
