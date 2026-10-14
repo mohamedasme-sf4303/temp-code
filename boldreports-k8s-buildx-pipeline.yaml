@@ -405,11 +405,11 @@ stages:
         branch: '${{ parameters.utility_branch_name }}'
       displayName: 'Checkout bold-reports-utilities'
 
-    - task: Syncfusion Gitea Checkout@1
-      inputs:
-        giteaUrl: 'https://gitea.syncfusion.com/bold-reports/bold-reports-utilities'
-        branch: '${{ parameters.utility_branch_name }}'
-      displayName: 'Checkout bold-reports-utilities'
+    - script: |
+        mkdir -p bold-reports-utilities
+        shopt -s dotglob extglob
+        mv !(bold-reports-utilities) bold-reports-utilities/
+      displayName: 'Move files to bold-reports-utilities'
 
     - bash: |
         cd "$(Build.SourcesDirectory)"
