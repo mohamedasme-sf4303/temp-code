@@ -505,6 +505,7 @@ stages:
             --builder boldreports-builder \
             --platform linux/amd64,linux/arm64 \
             -t "$EVAL_IMAGE" \
+            --build-arg INSTALL_POSTGRES=true \
             -f boldreports-manifest.txt \
             --push .
 
