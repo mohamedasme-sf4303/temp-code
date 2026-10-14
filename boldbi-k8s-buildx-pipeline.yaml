@@ -186,7 +186,7 @@ stages:
           IMAGES+=("${REPO}-ai:${{ parameters.imageTag }}")
         fi
         if [ "${{ parameters.All }}" = "True" ] || [ "${{ parameters.bold_MCP }}" = "True" ]; then
-          IMAGES+=("${REPO}-mcp:${{ parameters.imageTag }}")
+          IMAGES+=("${REPO}bi-mcp-server:${{ parameters.imageTag }}")
         fi
         if [ ${#IMAGES[@]} -eq 0 ]; then
           echo "No images selected to build. Nothing to verify."
@@ -579,6 +579,7 @@ stages:
           --push \
           -t "$IDP_WEB_IMAGE" \
           -f identity-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build Identity Web
       condition: or(eq('${{ parameters.id_web }}', true), eq('${{ parameters.All }}', true))
 
@@ -592,6 +593,7 @@ stages:
           --push \
           -t "$IDP_API_IMAGE" \
           -f identity-api-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build Identity API
       condition: or(eq('${{ parameters.id_api }}', true), eq('${{ parameters.All }}', true))
 
@@ -605,6 +607,7 @@ stages:
           --push \
           -t "$IDP_UMS_IMAGE" \
           -f ums-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build UMS
       condition: or(eq('${{ parameters.id_ums }}', true), eq('${{ parameters.All }}', true))
 
@@ -618,6 +621,7 @@ stages:
           --push \
           -t "$BI_WEB_IMAGE" \
           -f server-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build BI Server
       condition: or(eq('${{ parameters.bi_web }}', true), eq('${{ parameters.All }}', true))
 
@@ -631,6 +635,7 @@ stages:
           --push \
           -t "$BI_API_IMAGE" \
           -f server-api-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build BI Server API
       condition: or(eq('${{ parameters.bi_api }}', true), eq('${{ parameters.All }}', true))
 
@@ -644,6 +649,7 @@ stages:
           --push \
           -t "$BI_JOBS_IMAGE" \
           -f server-jobs-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build BI Jobs
       condition: or(eq('${{ parameters.bi_jobs }}', true), eq('${{ parameters.All }}', true))
 
@@ -657,6 +663,7 @@ stages:
           --push \
           -t "$BI_DESIGNER_IMAGE" \
           -f designer-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build BI Designer
       condition: or(eq('${{ parameters.bi_designer }}', true), eq('${{ parameters.All }}', true))
 
@@ -670,6 +677,7 @@ stages:
           --push \
           -t "$BI_ETL_IMAGE" \
           -f etl-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build ETL
       condition: or(eq('${{ parameters.bold_etl }}', true), eq('${{ parameters.All }}', true))
 
@@ -683,11 +691,12 @@ stages:
           --push \
           -t "$BI_AI_IMAGE" \
           -f ai-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build AI
       condition: or(eq('${{ parameters.bold_ai }}', true), eq('${{ parameters.All }}', true))
 
     - bash: |
-        BI_MCP_IMAGE="$(REPOSITORY)-mcp:${{ parameters.imageTag }}"
+        BI_MCP_IMAGE="$(REPOSITORY)bi-mcp-server:${{ parameters.imageTag }}"
         cd BoldBIServer-Linux
         
         docker buildx build \
@@ -696,5 +705,6 @@ stages:
           --push \
           -t "$BI_MCP_IMAGE" \
           -f mcp-manifest.Dockerfile .
+        docker buildx prune -af || true
       displayName: Build MCP
       condition: or(eq('${{ parameters.bold_mcp }}', true), eq('${{ parameters.All }}', true))
