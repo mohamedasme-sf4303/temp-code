@@ -87,10 +87,12 @@ parameters:
 steps:
 
 - bash: |
-    echo "$(DOCKER_PASSWORD)" | docker login \
-      -u "$(DOCKER_USERNAME)" \
-      --password-stdin
-  displayName: DockerLogin
+    docker login \
+      -u "$DOCKER_USERNAME" \
+      --password-stdin <<< "$DOCKER_PASSWORD"
+  env:
+    DOCKER_USERNAME: $(DOCKER_USERNAME)
+    DOCKER_PASSWORD: $(DOCKER_PASSWORD)
 
 #################################################
 # Docker Debian
