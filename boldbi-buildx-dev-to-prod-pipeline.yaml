@@ -86,11 +86,11 @@ parameters:
 
 steps:
 
-- task: Docker@2
-  displayName: Docker Login
-  inputs:
-    containerRegistry: dockerhub-CI
-    command: login
+- bash: |
+    echo "$(DOCKER_PASSWORD)" | docker login \
+      -u "$(DOCKER_USERNAME)" \
+      --password-stdin
+  displayName: DockerLogin
 
 #################################################
 # Docker Debian
