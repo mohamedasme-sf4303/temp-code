@@ -97,170 +97,132 @@ steps:
     containerRegistry: 'dockerhub-CI'
     command: 'login'
 
+# Docker Debian
+
 - bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-docker:${{ parameters.devTag }}
 
-    DEV_TAG="${{ parameters.devTag }}"
-    PROD_TAG="${{ parameters.prodTag }}"
+  displayName: Promote Docker Debian
+  condition: eq('${{ parameters.dockerDebian }}', true)
 
-    echo "DEV TAG  : $DEV_TAG"
-    echo "PROD TAG : $PROD_TAG"
+# Docker Eval
 
-    ####################################################
-    # Docker Debian
-    ####################################################
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports:${{ parameters.prodTag }}_eval \
+      syncfusion/dev-boldreports-docker:${{ parameters.devTag }}_eval
 
-    if [ "${{ parameters.dockerDebian }}" = "true" ]; then
+  displayName: Promote Docker Eval
+  condition: eq('${{ parameters.dockerEval }}', true)
 
-      docker buildx imagetools create \
-        -t syncfusion/boldreports:${PROD_TAG} \
-        syncfusion/dev-boldreports-docker:${DEV_TAG}
+# ID Web
 
-    fi
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/bold-identity:${{ parameters.prodTag }} \
+      syncfusion/dev-bold-identity:${{ parameters.devTag }}
 
-    ####################################################
-    # Docker Eval
-    ####################################################
+  displayName: Promote ID Web
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.idWeb }}', true))
 
-    if [ "${{ parameters.dockerEval }}" = "true" ]; then
+# ID API
 
-      docker buildx imagetools create \
-        -t syncfusion/boldreports:${PROD_TAG}_eval \
-        syncfusion/dev-boldreports-docker:${DEV_TAG}_eval
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/bold-idp-api:${{ parameters.prodTag }} \
+      syncfusion/dev-bold-idp-api:${{ parameters.devTag }}
 
-    fi
+  displayName: Promote ID API
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.idApi }}', true))
 
-    ####################################################
-    # ID Web
-    ####################################################
+# ID UMS
 
-    if [ "${{ parameters.idWeb }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/bold-ums:${{ parameters.prodTag }} \
+      syncfusion/dev-bold-ums:${{ parameters.devTag }}
 
-      docker buildx imagetools create \
-        -t syncfusion/bold-identity:${PROD_TAG} \
-        syncfusion/dev-bold-identity:${DEV_TAG}
+  displayName: Promote ID UMS
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.idUms }}', true))
 
-    fi
+# Reports Web
 
-    ####################################################
-    # ID API
-    ####################################################
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-server:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-server:${{ parameters.devTag }}
 
-    if [ "${{ parameters.idApi }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+  displayName: Promote Reports Web
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.reportsWeb }}', true))
 
-      docker buildx imagetools create \
-        -t syncfusion/bold-idp-api:${PROD_TAG} \
-        syncfusion/dev-bold-idp-api:${DEV_TAG}
+# Reports API
 
-    fi
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-server-api:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-server-api:${{ parameters.devTag }}
 
-    ####################################################
-    # ID UMS
-    ####################################################
+  displayName: Promote Reports API
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.reportsApi }}', true))
 
-    if [ "${{ parameters.idUms }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+# Reports Jobs
 
-      docker buildx imagetools create \
-        -t syncfusion/bold-ums:${PROD_TAG} \
-        syncfusion/dev-bold-ums:${DEV_TAG}
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-server-jobs:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-server-jobs:${{ parameters.devTag }}
 
-    fi
+  displayName: Promote Reports Jobs
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.reportsJobs }}', true))
 
-    ####################################################
-    # Reports Web
-    ####################################################
+# Designer
 
-    if [ "${{ parameters.reportsWeb }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-designer:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-designer:${{ parameters.devTag }}
 
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-server:${PROD_TAG} \
-        syncfusion/dev-boldreports-server:${DEV_TAG}
+  displayName: Promote Designer
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.designer }}', true))
 
-    fi
+# Viewer
 
-    ####################################################
-    # Reports API
-    ####################################################
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-viewer:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-viewer:${{ parameters.devTag }}
 
-    if [ "${{ parameters.reportsApi }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+  displayName: Promote Viewer
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.viewer }}', true))
 
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-server-api:${PROD_TAG} \
-        syncfusion/dev-boldreports-server-api:${DEV_TAG}
+# ETL
 
-    fi
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/bold-etl:${{ parameters.prodTag }} \
+      syncfusion/dev-bold-etl:${{ parameters.devTag }}
 
-    ####################################################
-    # Reports Jobs
-    ####################################################
+  displayName: Promote ETL
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.etl }}', true))
 
-    if [ "${{ parameters.reportsJobs }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+# AI
 
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-server-jobs:${PROD_TAG} \
-        syncfusion/dev-boldreports-server-jobs:${DEV_TAG}
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-ai:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-ai:${{ parameters.devTag }}
 
-    fi
+  displayName: Promote AI
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.ai }}', true))
 
-    ####################################################
-    # Designer
-    ####################################################
+# MCP
 
-    if [ "${{ parameters.designer }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
+- bash: |
+    docker buildx imagetools create \
+      -t syncfusion/boldreports-mcp-server:${{ parameters.prodTag }} \
+      syncfusion/dev-boldreports-mcp-server:${{ parameters.devTag }}
 
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-designer:${PROD_TAG} \
-        syncfusion/dev-boldreports-designer:${DEV_TAG}
-
-    fi
-
-    ####################################################
-    # Viewer
-    ####################################################
-
-    if [ "${{ parameters.viewer }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
-
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-viewer:${PROD_TAG} \
-        syncfusion/dev-boldreports-viewer:${DEV_TAG}
-
-    fi
-
-    ####################################################
-    # ETL
-    ####################################################
-
-    if [ "${{ parameters.etl }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
-
-      docker buildx imagetools create \
-        -t syncfusion/bold-etl:${PROD_TAG} \
-        syncfusion/dev-bold-etl:${DEV_TAG}
-
-    fi
-
-    ####################################################
-    # AI
-    ####################################################
-
-    if [ "${{ parameters.ai }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
-
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-ai:${PROD_TAG} \
-        syncfusion/dev-boldreports-ai:${DEV_TAG}
-
-    fi
-
-    ####################################################
-    # MCP
-    ####################################################
-
-    if [ "${{ parameters.mcp }}" = "true" ] || [ "${{ parameters.k8sAll }}" = "true" ]; then
-
-      docker buildx imagetools create \
-        -t syncfusion/boldreports-mcp-server:${PROD_TAG} \
-        syncfusion/dev-boldreports-mcp-server:${DEV_TAG}
-
-    fi
-
-    echo "Promotion Completed Successfully"
-
-  displayName: Promote Dev Images To Prod
+  displayName: Promote MCP
+  condition: or(eq('${{ parameters.k8sAll }}', true), eq('${{ parameters.mcp }}', true))
