@@ -10,6 +10,7 @@ variables:
   ARM_SUBNET: buildx-sub
   ARM_VM_NAME: boldreports-arm-$(Build.BuildId)
   BUILDER_NAME: boldreports-k8s-builder-$(Build.BuildId)
+  ARM_ADMIN_PASSWORD: Admin@123123
 
 parameters:
   - name: imageTag
@@ -139,13 +140,15 @@ stages:
             --size "$(ARM_VM_SIZE)" \
             --vnet-name "$(ARM_VNET)" \
             --subnet "$(ARM_SUBNET)" \
+            --nsg "" \
             --public-ip-address "" \
             --admin-username azureuser \
-            --generate-ssh-keys \
+            --authentication-type password \
+            --admin-password "$(ARM_ADMIN_PASSWORD)" \
             --nic-delete-option Delete \
             --os-disk-delete-option Delete \
-            --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx \
-            --debug 2>&1 | tail -n 60
+            --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx
+            
           ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
           if [ -z "$ARM64_IP" ]; then
             echo "ARM64 IP not found"
