@@ -135,7 +135,6 @@ stages:
           az vm create \
             --resource-group "$(ARM_RG)" \
             --name "$(ARM_VM_NAME)" \
-            --vmss "$(ARM_VMSS)" \
             --image "$(ARM_IMAGE_ID)" \
             --size "$(ARM_VM_SIZE)" \
             --vnet-name "$(ARM_VNET)" \
@@ -145,8 +144,8 @@ stages:
             --generate-ssh-keys \
             --nic-delete-option Delete \
             --os-disk-delete-option Delete \
-            --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx
-
+            --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx \
+            --debug 2>&1 | tail -n 60
           ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
           if [ -z "$ARM64_IP" ]; then
             echo "ARM64 IP not found"
