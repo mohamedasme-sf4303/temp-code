@@ -128,77 +128,41 @@ stages:
     - task: AzureCLI@2
       displayName: Create ARM64 VM
       inputs:
-
         azureSubscription: $(AZ_SERVICE_CONNECTION)
-
         scriptType: bash
-
         scriptLocation: inlineScript
-
         inlineScript: |
-
           set -eo pipefail
-
           ARGS=(
-
             --resource-group "$(ARM_RG)"
-
             --location eastus
-
             --name "$(ARM_VM_NAME)"
-
             --image "$(ARM_IMAGE_ID)"
-
             --size "$(ARM_VM_SIZE)"
-
             --security-type TrustedLaunch
-
             --enable-secure-boot true
-
             --enable-vtpm true
-
             --vnet-name "$(ARM_VNET)"
-
             --subnet "$(ARM_SUBNET)"
-
             --nsg ""
-
             --public-ip-address ""
-
             --admin-username azureuser
-
             --authentication-type password
-
             --admin-password "$ARM_ADMIN_PASSWORD"
-
             --nic-delete-option Delete
-
             --os-disk-delete-option Delete
-
             --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx
-
           )
-
           az vm create "${ARGS[@]}"
-
-
           ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
-
           if [ -z "$ARM64_IP" ]; then
-
             echo "ARM64 IP not found"
-
             exit 1
-
           fi
-
           echo "ARM64 VM: $(ARM_VM_NAME)  IP: $ARM64_IP"
-
           echo "##vso[task.setvariable variable=arm64_vm_private_ip]$ARM64_IP"
-
-        env:
-
-          ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
+      env:
+        ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
 
     #################################################
     # Download package & clone utilities
