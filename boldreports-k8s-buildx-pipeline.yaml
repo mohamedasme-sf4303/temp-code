@@ -135,6 +135,7 @@ stages:
           set -e
           az vm create \
             --resource-group "$(ARM_RG)" \
+            --location eastus \
             --name "$(ARM_VM_NAME)" \
             --image "$(ARM_IMAGE_ID)" \
             --size "$(ARM_VM_SIZE)" \
