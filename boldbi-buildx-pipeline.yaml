@@ -88,8 +88,8 @@ stages:
             --security-type TrustedLaunch \
             --enable-secure-boot true \
             --enable-vtpm true \
-            --vnet-name "$(ARM_VNET)"
-            --subnet "$(ARM_SUBNET)"
+            --vnet-name "$(ARM_VNET)" \
+            --subnet "$(ARM_SUBNET)" \
             --nsg "" \
             --public-ip-address "" \
             --admin-username azureuser \
