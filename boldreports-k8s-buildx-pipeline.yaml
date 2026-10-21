@@ -168,6 +168,15 @@ stages:
           ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
 
     #################################################
+    # Docker login (same for cloud and selfhost)
+    #################################################
+    - bash: |
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          --username syncfusion \
+          --password-stdin
+      displayName: Docker Login
+
+    #################################################
     # Download package & clone utilities
     #################################################
     - task: Syncfusion Gitea Checkout@1
@@ -280,14 +289,7 @@ stages:
         echo "FILE PREPARATION COMPLETED SUCCESSFULLY"
       displayName: 'Copy Dockerfiles & Entrypoints'
 
-    #################################################
-    # Docker login (same for cloud and selfhost)
-    #################################################
-    - task: Docker@2
-      displayName: 'Docker Login'
-      inputs:
-        containerRegistry: 'dockerhub-CI'
-        command: 'login'
+
 
     #################################################
     # Builder setup
