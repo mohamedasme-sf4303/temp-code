@@ -8,6 +8,7 @@ variables:
   ARM_VM_SIZE: Standard_D2ps_v6
   ARM_VM_NAME: boldreports-sh-arm-$(Build.BuildId)
   BUILDER_NAME: boldreports-sh-builder-$(Build.BuildId)
+  CLOUD_BUILDER_ENDPOINT: syncfusion/boldreports-cloud   # TODO: confirm the real Docker Build Cloud builder name
   ARM_ADMIN_PASSWORD: Admin@123123
 
 parameters:
@@ -26,6 +27,13 @@ parameters:
   values:
     - dev
     - production
+- name: buildType
+  displayName: Build Type
+  type: string
+  default: selfhost
+  values:
+    - cloud
+    - selfhost
 - name: imagesType
   displayName: Images Type
   type: string
@@ -56,9 +64,6 @@ stages:
       name: boldreports-buildx-amd64-vmss-agent-pool
     steps:
 
-    #################################################
-    # Validate Tag
-    #################################################
     - bash: |
         TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
         if [[ ! "$TAG" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
@@ -68,9 +73,6 @@ stages:
         echo "Image tag validation successful"
       displayName: Validate Tag
 
-    #################################################
-    # Repository Selection
-    #################################################
     - bash: |
         if [ "${{ parameters.environment }}" = "dev" ]; then
           REPO="syncfusion/dev-boldreports-docker"
@@ -81,46 +83,47 @@ stages:
       displayName: Set Docker Repository
 
     #################################################
-    # Create this run's ARM64 VM
+    # Create this run's ARM64 VM (selfhost only)
     #################################################
-    - task: AzureCLI@2
-      displayName: Create ARM64 VM
-      inputs:
-        azureSubscription: $(AZ_SERVICE_CONNECTION)
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          set -eo pipefail
-          ARGS=(
-            --resource-group "$(ARM_RG)"
-            --location eastus
-            --name "$(ARM_VM_NAME)"
-            --image "$(ARM_IMAGE_ID)"
-            --size "$(ARM_VM_SIZE)"
-            --security-type TrustedLaunch
-            --enable-secure-boot true
-            --enable-vtpm true
-            --vnet-name buildx-vnet
-            --subnet buildx-sub
-            --nsg ""
-            --public-ip-address ""
-            --admin-username azureuser
-            --authentication-type password
-            --admin-password "$ARM_ADMIN_PASSWORD"
-            --nic-delete-option Delete
-            --os-disk-delete-option Delete
-            --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx
-          )
-          az vm create "${ARGS[@]}"
-          ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
-          if [ -z "$ARM64_IP" ]; then
-            echo "ARM64 IP not found"
-            exit 1
-          fi
-          echo "ARM64 VM: $(ARM_VM_NAME)  IP: $ARM64_IP"
-          echo "##vso[task.setvariable variable=arm64_vm_private_ip]$ARM64_IP"
-      env:
-        ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - task: AzureCLI@2
+        displayName: Create ARM64 VM
+        inputs:
+          azureSubscription: $(AZ_SERVICE_CONNECTION)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -eo pipefail
+            ARGS=(
+              --resource-group "$(ARM_RG)"
+              --location eastus
+              --name "$(ARM_VM_NAME)"
+              --image "$(ARM_IMAGE_ID)"
+              --size "$(ARM_VM_SIZE)"
+              --security-type TrustedLaunch
+              --enable-secure-boot true
+              --enable-vtpm true
+              --vnet-name buildx-vnet
+              --subnet buildx-sub
+              --nsg ""
+              --public-ip-address ""
+              --admin-username azureuser
+              --authentication-type password
+              --admin-password "$ARM_ADMIN_PASSWORD"
+              --nic-delete-option Delete
+              --os-disk-delete-option Delete
+              --tags pipelineBuildId=$(Build.BuildId) createdBy=azdo-buildx
+            )
+            az vm create "${ARGS[@]}"
+            ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
+            if [ -z "$ARM64_IP" ]; then
+              echo "ARM64 IP not found"
+              exit 1
+            fi
+            echo "ARM64 VM: $(ARM_VM_NAME)  IP: $ARM64_IP"
+            echo "##vso[task.setvariable variable=arm64_vm_private_ip]$ARM64_IP"
+        env:
+          ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
 
     #################################################
     # Download Package & Utilities
@@ -151,31 +154,32 @@ stages:
         displayName: 'Clone Bold Reports Utilities'
 
     #################################################
-    # Docker Login
-    #################################################
-    - task: Docker@2
-      displayName: 'Docker Login'
-      inputs:
-        containerRegistry: 'dockerhub-CI'
-        command: 'login'
-
-    #################################################
-    # Wait For ARM64 BuildKit
+    # Docker Login (same login for cloud and selfhost)
     #################################################
     - bash: |
-        echo "Waiting for ARM64 BuildKit..."
-        for i in {1..60}
-        do
-          if nc -z $(arm64_vm_private_ip) 1234; then
-            echo "BuildKit reachable"
-            exit 0
-          fi
-          echo "Waiting BuildKit ($i/60)..."
-          sleep 10
-        done
-        echo "BuildKit not reachable"
-        exit 1
-      displayName: Wait For BuildKit
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          -u "$(DOCKER_USERNAME)" \
+          --password-stdin
+      displayName: Docker Login
+
+    #################################################
+    # Wait For ARM64 BuildKit (selfhost only)
+    #################################################
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - bash: |
+          echo "Waiting for ARM64 BuildKit..."
+          for i in {1..60}
+          do
+            if nc -z $(arm64_vm_private_ip) 1234; then
+              echo "BuildKit reachable"
+              exit 0
+            fi
+            echo "Waiting BuildKit ($i/60)..."
+            sleep 10
+          done
+          echo "BuildKit not reachable"
+          exit 1
+        displayName: Wait For BuildKit
 
     #################################################
     # Prepare Files
@@ -243,28 +247,44 @@ stages:
         displayName: 'Prepare Files (no_move_files)'
 
     #################################################
-    # Buildx - Build & Push Multi-Arch Images
+    # Builder setup
+    #################################################
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - bash: |
+          set -e
+          docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
+
+          docker buildx create \
+            --name "$(BUILDER_NAME)" \
+            --driver remote \
+            --platform linux/amd64 \
+            tcp://127.0.0.1:1234
+
+          docker buildx create \
+            --append \
+            --name "$(BUILDER_NAME)" \
+            --driver remote \
+            --platform linux/arm64 \
+            tcp://$(arm64_vm_private_ip):1234
+
+          docker buildx use "$(BUILDER_NAME)"
+          docker buildx inspect --bootstrap
+        displayName: Initialize selfhost Buildx Builder
+
+    - ${{ if eq(parameters.buildType, 'cloud') }}:
+      - bash: |
+          set -e
+          docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
+          docker buildx create --name "$(BUILDER_NAME)" --driver cloud "syncfusion/boldbi-cloud"
+          docker buildx use "$(BUILDER_NAME)"
+          docker buildx inspect --bootstrap
+        displayName: Initialize cloud Buildx Builder
+
+    #################################################
+    # Build & Push Multi-Arch Images
     #################################################
     - bash: |
         set -e
-        docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
-
-        docker buildx create \
-          --name "$(BUILDER_NAME)" \
-          --driver remote \
-          --platform linux/amd64 \
-          tcp://127.0.0.1:1234
-
-        docker buildx create \
-          --append \
-          --name "$(BUILDER_NAME)" \
-          --driver remote \
-          --platform linux/arm64 \
-          tcp://$(arm64_vm_private_ip):1234
-
-        docker buildx use "$(BUILDER_NAME)"
-        docker buildx inspect --bootstrap
-
         DEBIAN_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)"
         EVAL_IMAGE="$(REPOSITORY):${{ parameters.imageTag }}_$(Build.BuildId)_eval"
         IMAGES_TYPE="${{ parameters.imagesType }}"
@@ -295,10 +315,10 @@ stages:
             --push .
           echo "Eval Image Pushed Successfully"
         fi
-      displayName: Selfhost Buildx Multi-Arch Build
+      displayName: Buildx Multi-Arch Build
 
     #################################################
-    # Verify Multi-Arch Images (single check, push is finished)
+    # Verify Multi-Arch Images
     #################################################
     - bash: |
         TAG="${{ parameters.imageTag }}_$(Build.BuildId)"
@@ -318,7 +338,7 @@ stages:
       displayName: Verify Multi-Arch Images
 
     #################################################
-    # Cleanup (always runs; deletes ONLY this run's VM)
+    # Cleanup (always)
     #################################################
     - bash: |
         docker buildx rm "$(BUILDER_NAME)" || true
@@ -327,13 +347,14 @@ stages:
       displayName: Cleanup Docker
       condition: always()
 
-    - task: AzureCLI@2
-      displayName: Delete this run's ARM64 VM
-      condition: always()
-      inputs:
-        azureSubscription: $(AZ_SERVICE_CONNECTION)
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          az vm delete -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --yes --force-deletion true || true
-          echo "Deleted $(ARM_VM_NAME)"
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - task: AzureCLI@2
+        displayName: Delete this run's ARM64 VM
+        condition: always()
+        inputs:
+          azureSubscription: $(AZ_SERVICE_CONNECTION)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            az vm delete -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --yes --force-deletion true || true
+            echo "Deleted $(ARM_VM_NAME)"
