@@ -3,7 +3,7 @@ trigger: none
 variables:
   AZ_SERVICE_CONNECTION: boldbi-buildx-new-services-connetion-for-amd64
   ARM_RG: boldbi-test
-  ARM_IMAGE_ID: /subscriptions/b7ba5c62-bc85-451a-a00e-0a9ceddf48c3/resourceGroups/boldreports-test/providers/Microsoft.Compute/galleries/boldreports_ga/images/boldreports_buildx_arm64/versions/0.0.1
+  ARM_IMAGE_ID: /subscriptions/b7ba5c62-bc85-451a-a00e-0a9ceddf48c3/resourceGroups/boldbi-test/providers/Microsoft.Compute/galleries/boldreports_ga/images/boldreports_buildx_arm64/versions/0.0.1
   ARM_VM_SIZE: Standard_D2ps_v6
   ARM_VM_NAME: boldbi-k8s-arm-$(Build.BuildId)
   BUILDER_NAME: boldbi-k8s-builder-$(Build.BuildId)
