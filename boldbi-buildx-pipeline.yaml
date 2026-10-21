@@ -129,11 +129,11 @@ stages:
         wget https://raw.githubusercontent.com/mohamedasme-sf4303/temp-code/refs/heads/main/boldbi-manifets.txt
       displayName: Download Package
 
-    - task: Docker@2
+    - bash: |
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          --username syncfusion \
+          --password-stdin
       displayName: Docker Login
-      inputs:
-        containerRegistry: dockerhub-CI
-        command: login
 
     - ${{ if eq(parameters.buildType, 'selfhost') }}:
       - bash: |
@@ -180,7 +180,7 @@ stages:
       - bash: |
           set -e
           docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
-          docker buildx create --name "$(BUILDER_NAME)" --driver cloud "syncfusion/boldbi-cloud"
+          docker buildx create --name "$(BUILDER_NAME)" --driver cloud "syncfusion/boldbi-cloud" --use
           docker buildx use "$(BUILDER_NAME)"
           docker buildx inspect --bootstrap
         displayName: Initialize cloud Buildx Builder
