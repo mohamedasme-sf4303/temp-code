@@ -25,6 +25,11 @@ parameters:
     type: string
     default: dev
     values: [dev, production]
+  - name: buildType
+    displayName: Build Type
+    type: string
+    default: selfhost
+    values: [cloud, selfhost]
   - name: github_branch
     displayName: BoldBI CI BranchName
     type: string
@@ -110,6 +115,7 @@ stages:
     #################################################
     - task: AzureCLI@2
       displayName: Create ARM64 VM
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
       inputs:
         azureSubscription: $(AZ_SERVICE_CONNECTION)
         scriptType: bash
@@ -238,11 +244,11 @@ stages:
 
           sudo ls -la "$destDir"/*.Dockerfile
 
-    - task: Docker@2
+    - bash: |
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          -u "$(DOCKER_USERNAME)" \
+          --password-stdin
       displayName: Docker Login
-      inputs:
-        containerRegistry: dockerhub-CI
-        command: login
 
     #################################################
     # Wait for ARM64 BuildKit, then create builder
@@ -260,6 +266,7 @@ stages:
         echo "BuildKit not reachable"
         exit 1
       displayName: Wait For BuildKit
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
     - bash: |
         set -e
@@ -280,8 +287,15 @@ stages:
 
         docker buildx use "$(BUILDER_NAME)"
         docker buildx inspect --bootstrap
-      displayName: Initialize Buildx Builder
+      displayName: Initialize selfhost Buildx Builder
+      condition: eq('${{ parameters.buildType }}', 'selfhost')
 
+    - bash: |
+        set -e
+        docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
+        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+      displayName: Initialize Buildx Builder
+      docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
     #################################################
     # Builds
     #################################################
@@ -429,6 +443,7 @@ stages:
         docker system prune -af || true
       displayName: Cleanup Docker
       condition: always()
+      condition: eq('${{ parameters.buildType }}', 'cloud')
 
     - task: AzureCLI@2
       displayName: Delete ARM64 VM
