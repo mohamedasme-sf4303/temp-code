@@ -111,46 +111,46 @@ stages:
       displayName: Set Docker Repository
 
     #################################################
-    # Create ARM64 VM (deleted in the last step)
+    # Create ARM64 VM (selfhost only; deleted in the last step)
     #################################################
-    - task: AzureCLI@2
-      displayName: Create ARM64 VM
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
-      inputs:
-        azureSubscription: $(AZ_SERVICE_CONNECTION)
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          set -eo pipefail
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - task: AzureCLI@2
+        displayName: Create ARM64 VM
+        inputs:
+          azureSubscription: $(AZ_SERVICE_CONNECTION)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -eo pipefail
 
-          az vm create \
-            --resource-group "$(ARM_RG)" \
-            --location eastus \
-            --name "$(ARM_VM_NAME)" \
-            --image "$(ARM_IMAGE_ID)" \
-            --size "$(ARM_VM_SIZE)" \
-            --security-type TrustedLaunch \
-            --enable-secure-boot true \
-            --enable-vtpm true \
-            --vnet-name "$(ARM_VNET)" \
-            --subnet "$(ARM_SUBNET)" \
-            --nsg "" \
-            --public-ip-address "" \
-            --admin-username azureuser \
-            --authentication-type password \
-            --admin-password "$ARM_ADMIN_PASSWORD" \
-            --nic-delete-option Delete \
-            --os-disk-delete-option Delete \
-            --tags pipelineBuildId=$(Build.BuildId)
+            az vm create \
+              --resource-group "$(ARM_RG)" \
+              --location eastus \
+              --name "$(ARM_VM_NAME)" \
+              --image "$(ARM_IMAGE_ID)" \
+              --size "$(ARM_VM_SIZE)" \
+              --security-type TrustedLaunch \
+              --enable-secure-boot true \
+              --enable-vtpm true \
+              --vnet-name "$(ARM_VNET)" \
+              --subnet "$(ARM_SUBNET)" \
+              --nsg "" \
+              --public-ip-address "" \
+              --admin-username azureuser \
+              --authentication-type password \
+              --admin-password "$ARM_ADMIN_PASSWORD" \
+              --nic-delete-option Delete \
+              --os-disk-delete-option Delete \
+              --tags pipelineBuildId=$(Build.BuildId)
 
-          ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
-          if [ -z "$ARM64_IP" ]; then
-            echo "ARM64 IP not found"
-            exit 1
-          fi
-          echo "##vso[task.setvariable variable=arm64_vm_private_ip]$ARM64_IP"
-      env:
-        ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
+            ARM64_IP=$(az vm show -d -g "$(ARM_RG)" -n "$(ARM_VM_NAME)" --query privateIps -o tsv)
+            if [ -z "$ARM64_IP" ]; then
+              echo "ARM64 IP not found"
+              exit 1
+            fi
+            echo "##vso[task.setvariable variable=arm64_vm_private_ip]$ARM64_IP"
+        env:
+          ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
 
     #################################################
     # Checkout + prepare application and Dockerfiles
@@ -251,51 +251,53 @@ stages:
       displayName: Docker Login
 
     #################################################
-    # Wait for ARM64 BuildKit, then create builder
+    # Builder setup
     #################################################
-    - bash: |
-        echo "Waiting for ARM64 BuildKit..."
-        for i in {1..60}; do
-          if nc -z $(arm64_vm_private_ip) 1234; then
-            echo "BuildKit reachable"
-            exit 0
-          fi
-          echo "Waiting BuildKit ($i/60)..."
-          sleep 10
-        done
-        echo "BuildKit not reachable"
-        exit 1
-      displayName: Wait For BuildKit
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - bash: |
+          echo "Waiting for ARM64 BuildKit..."
+          for i in {1..60}; do
+            if nc -z $(arm64_vm_private_ip) 1234; then
+              echo "BuildKit reachable"
+              exit 0
+            fi
+            echo "Waiting BuildKit ($i/60)..."
+            sleep 10
+          done
+          echo "BuildKit not reachable"
+          exit 1
+        displayName: Wait For BuildKit
 
-    - bash: |
-        set -e
-        docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
+      - bash: |
+          set -e
+          docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
 
-        docker buildx create \
-          --name "$(BUILDER_NAME)" \
-          --driver remote \
-          --platform linux/amd64 \
-          tcp://127.0.0.1:1234
+          docker buildx create \
+            --name "$(BUILDER_NAME)" \
+            --driver remote \
+            --platform linux/amd64 \
+            tcp://127.0.0.1:1234
 
-        docker buildx create \
-          --append \
-          --name "$(BUILDER_NAME)" \
-          --driver remote \
-          --platform linux/arm64 \
-          tcp://$(arm64_vm_private_ip):1234
+          docker buildx create \
+            --append \
+            --name "$(BUILDER_NAME)" \
+            --driver remote \
+            --platform linux/arm64 \
+            tcp://$(arm64_vm_private_ip):1234
 
-        docker buildx use "$(BUILDER_NAME)"
-        docker buildx inspect --bootstrap
-      displayName: Initialize selfhost Buildx Builder
-      condition: eq('${{ parameters.buildType }}', 'selfhost')
+          docker buildx use "$(BUILDER_NAME)"
+          docker buildx inspect --bootstrap
+        displayName: Initialize selfhost Buildx Builder
 
-    - bash: |
-        set -e
-        docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
-        docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
-      displayName: Initialize Buildx Builder
-      docker buildx create --use --driver cloud "syncfusion/boldbi-cloud"
+    - ${{ if eq(parameters.buildType, 'cloud') }}:
+      - bash: |
+          set -e
+          docker buildx rm "$(BUILDER_NAME)" 2>/dev/null || true
+          docker buildx create --name "$(BUILDER_NAME)" --driver cloud "syncfusion/boldbi-cloud"
+          docker buildx use "$(BUILDER_NAME)"
+          docker buildx inspect --bootstrap
+        displayName: Initialize cloud Buildx Builder
+
     #################################################
     # Builds
     #################################################
@@ -400,7 +402,7 @@ stages:
       condition: and(succeeded(), or(eq('${{ parameters.bold_mcp }}', true), eq('${{ parameters.All }}', true)))
 
     #################################################
-    # Verify multi-arch (replaces the 40-min polling job)
+    # Verify multi-arch
     #################################################
     - bash: |
         TAG="${{ parameters.imageTag }}"
@@ -408,16 +410,16 @@ stages:
         IMAGES=()
         sel() { [ "${{ parameters.All }}" = "True" ] || [ "$1" = "True" ]; }
 
-        sel "${{ parameters.id_web }}"     && IMAGES+=("${R}-identity:$TAG")
-        sel "${{ parameters.id_api }}"     && IMAGES+=("${R}-identity-api:$TAG")
-        sel "${{ parameters.id_ums }}"     && IMAGES+=("${R}-ums:$TAG")
-        sel "${{ parameters.bi_web }}"     && IMAGES+=("${R}bi-server:$TAG")
-        sel "${{ parameters.bi_api }}"     && IMAGES+=("${R}bi-server-api:$TAG")
-        sel "${{ parameters.bi_jobs }}"    && IMAGES+=("${R}bi-server-jobs:$TAG")
+        sel "${{ parameters.id_web }}"      && IMAGES+=("${R}-identity:$TAG")
+        sel "${{ parameters.id_api }}"      && IMAGES+=("${R}-identity-api:$TAG")
+        sel "${{ parameters.id_ums }}"      && IMAGES+=("${R}-ums:$TAG")
+        sel "${{ parameters.bi_web }}"      && IMAGES+=("${R}bi-server:$TAG")
+        sel "${{ parameters.bi_api }}"      && IMAGES+=("${R}bi-server-api:$TAG")
+        sel "${{ parameters.bi_jobs }}"     && IMAGES+=("${R}bi-server-jobs:$TAG")
         sel "${{ parameters.bi_designer }}" && IMAGES+=("${R}bi-designer:$TAG")
-        sel "${{ parameters.bold_etl }}"   && IMAGES+=("${R}-etl:$TAG")
-        sel "${{ parameters.bold_ai }}"    && IMAGES+=("${R}-ai:$TAG")
-        sel "${{ parameters.bold_mcp }}"   && IMAGES+=("${R}bi-mcp-server:$TAG")
+        sel "${{ parameters.bold_etl }}"    && IMAGES+=("${R}-etl:$TAG")
+        sel "${{ parameters.bold_ai }}"     && IMAGES+=("${R}-ai:$TAG")
+        sel "${{ parameters.bold_mcp }}"    && IMAGES+=("${R}bi-mcp-server:$TAG")
 
         if [ ${#IMAGES[@]} -eq 0 ]; then
           echo "No images selected."
@@ -443,19 +445,19 @@ stages:
         docker system prune -af || true
       displayName: Cleanup Docker
       condition: always()
-      condition: eq('${{ parameters.buildType }}', 'cloud')
 
-    - task: AzureCLI@2
-      displayName: Delete ARM64 VM
-      condition: always()
-      inputs:
-        azureSubscription: $(AZ_SERVICE_CONNECTION)
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          az vm delete \
-            -g "$(ARM_RG)" \
-            -n "$(ARM_VM_NAME)" \
-            --yes \
-            --force-deletion true || true
-          echo "Deleted $(ARM_VM_NAME)"
+    - ${{ if eq(parameters.buildType, 'selfhost') }}:
+      - task: AzureCLI@2
+        displayName: Delete ARM64 VM
+        condition: always()
+        inputs:
+          azureSubscription: $(AZ_SERVICE_CONNECTION)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            az vm delete \
+              -g "$(ARM_RG)" \
+              -n "$(ARM_VM_NAME)" \
+              --yes \
+              --force-deletion true || true
+            echo "Deleted $(ARM_VM_NAME)"
