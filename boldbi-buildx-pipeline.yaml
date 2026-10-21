@@ -2,18 +2,14 @@ trigger: none
 
 variables:
   AZ_SERVICE_CONNECTION: boldbi-self-host-buildx-testing
-
   ARM_RG: boldbi-test
-
-  ARM_IMAGE_ID: /subscriptions/xxxxxxxx/resourceGroups/boldbi-test/providers/Microsoft.Compute/galleries/boldbi_ga/images/boldbi_buildx_arm64/versions/0.0.1
-
+  ARM_IMAGE_ID: /subscriptions/b7ba5c62-bc85-451a-a00e-0a9ceddf48c3/resourceGroups/boldbi-test/providers/Microsoft.Compute/galleries/boldbi_ga/images/boldbi_buildx_arm64/versions/0.0.1
   ARM_VM_SIZE: Standard_D2ps_v6
-
   ARM_VM_NAME: boldbi-sh-arm-$(Build.BuildId)
-
   BUILDER_NAME: boldbi-builder-$(Build.BuildId)
-
   ARM_ADMIN_PASSWORD: Admin@123123
+  ARM_VNET: buildx-vnet
+  ARM_SUBNET: buildx-sub
 
 parameters:
 
@@ -49,7 +45,7 @@ stages:
   - job: DockerBuild
 
     pool:
-      name: boldbi-buildx-amd64-vmss-agent-pool
+      name: boldbi-buildx-amd64-vmss-agent-pool-new
 
     steps:
 
@@ -92,8 +88,8 @@ stages:
             --security-type TrustedLaunch \
             --enable-secure-boot true \
             --enable-vtpm true \
-            --vnet-name buildx-vnet \
-            --subnet buildx-sub \
+            --vnet-name "$(ARM_VNET)"
+            --subnet "$(ARM_SUBNET)"
             --nsg "" \
             --public-ip-address "" \
             --admin-username azureuser \
