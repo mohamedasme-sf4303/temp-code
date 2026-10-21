@@ -158,7 +158,7 @@ stages:
     #################################################
     - bash: |
         echo "$(DOCKER_PASSWORD)" | docker login \
-          -u "$(DOCKER_USERNAME)" \
+          --username syncfusion \
           --password-stdin
       displayName: Docker Login
 
