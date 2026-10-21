@@ -120,6 +120,12 @@ stages:
           ARM_ADMIN_PASSWORD: $(ARM_ADMIN_PASSWORD)
 
     - bash: |
+        echo "$(DOCKER_PASSWORD)" | docker login \
+          --username syncfusion \
+          --password-stdin
+      displayName: Docker Login
+
+    - bash: |
         wget "${{ parameters.boldbiPackage }}"
 
         unzip BoldBI*.zip
@@ -128,12 +134,6 @@ stages:
 
         wget https://raw.githubusercontent.com/mohamedasme-sf4303/temp-code/refs/heads/main/boldbi-manifets.txt
       displayName: Download Package
-
-    - bash: |
-        echo "$(DOCKER_PASSWORD)" | docker login \
-          --username syncfusion \
-          --password-stdin
-      displayName: Docker Login
 
     - ${{ if eq(parameters.buildType, 'selfhost') }}:
       - bash: |
