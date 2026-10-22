@@ -91,7 +91,7 @@ stages:
 
             az vm create \
               --resource-group "$(ARM_RG)" \
-              --location eastus \
+              --location centralindia \
               --name "$(ARM_VM_NAME)" \
               --image "$(ARM_IMAGE_ID)" \
               --size "$(ARM_VM_SIZE)" \
