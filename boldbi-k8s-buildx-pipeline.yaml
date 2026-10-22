@@ -88,7 +88,7 @@ stages:
     workspace:
       clean: all
     pool:
-      name: bold-reports-buildx-amd64-vmss-agnet-pool
+      name: bold-bi-buildx-amd64-vmss-agnet-pool
 
     steps:
     - checkout: none
