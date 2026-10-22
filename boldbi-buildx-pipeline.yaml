@@ -1,14 +1,15 @@
 trigger: none
 
 variables:
-  AZ_SERVICE_CONNECTION: boldbi-buildx-new-services-connetion-for-amd64
-  ARM_RG: boldbi-test
-  ARM_IMAGE_ID: /subscriptions/b7ba5c62-bc85-451a-a00e-0a9ceddf48c3/resourceGroups/boldbi-test/providers/Microsoft.Compute/galleries/boldreports_ga/images/boldreports_buildx_arm64/versions/0.0.1
+  AZ_SERVICE_CONNECTION: bold-bi-buildx-services-connection
+  ARM_RG: bold-bi-reports-buildx
+  ARM_IMAGE_ID: /subscriptions/80e2133e-f876-4916-806d-cd252db82d0d/resourceGroups/bold-bi-reports-buildx/providers/Microsoft.Compute/galleries/bold_bi_reports_buildx_image_gallery/images/bold_bi_reports_buildx_arm64_image/versions/1.0.0
   ARM_VM_SIZE: Standard_D2ps_v6
-  ARM_VM_NAME: boldbi-sh-arm-$(Build.BuildId)
+  ARM_VM_NAME: boldbi-arm-$(Build.BuildId)
   BUILDER_NAME: boldbi-builder-$(Build.BuildId)
-  ARM_VNET: buildx-vnet
-  ARM_SUBNET: buildx-sub
+  ARM_VNET: bold-bi-reports-buildx
+  ARM_SUBNET: bold-bi-reports-buildx-subnet
+  CLOUD_BUILDER_ENDPOINT: syncfusion/boldbi-cloud
   ARM_ADMIN_PASSWORD: Admin@123123
 
 parameters:
@@ -53,7 +54,7 @@ stages:
   - job: DockerBuild
 
     pool:
-      name: boldbi-buildx-amd64-vmss-agent-pool-new
+      name: bold-bi-buildx-amd64-vmss-agnet-pool
 
     steps:
 
