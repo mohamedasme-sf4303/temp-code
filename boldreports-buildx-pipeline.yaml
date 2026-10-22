@@ -62,7 +62,7 @@ stages:
     displayName: Build Docker Image
     timeoutInMinutes: 240
     pool:
-      name: boldreports-buildx-amd64-vmss-agent-pool
+      name: bold-reports-buildx-amd64-vmss-agnet-pool
     steps:
 
     - bash: |
