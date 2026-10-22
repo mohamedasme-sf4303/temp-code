@@ -1,12 +1,12 @@
 trigger: none
 
 variables:
-  AZ_SERVICE_CONNECTION: bold-reports-buildx-services-connection
+  AZ_SERVICE_CONNECTION: bold-bi-buildx-services-connection
   ARM_RG: bold-bi-reports-buildx
   ARM_IMAGE_ID: /subscriptions/80e2133e-f876-4916-806d-cd252db82d0d/resourceGroups/bold-bi-reports-buildx/providers/Microsoft.Compute/galleries/bold_bi_reports_buildx_image_gallery/images/bold_bi_reports_buildx_arm64_image/versions/1.0.0
   ARM_VM_SIZE: Standard_D2ps_v6
-  ARM_VM_NAME: boldreports-arm-$(Build.BuildId)
-  BUILDER_NAME: boldreports-builder-$(Build.BuildId)
+  ARM_VM_NAME: boldbi-arm-$(Build.BuildId)
+  BUILDER_NAME: boldbi-builder-$(Build.BuildId)
   ARM_VNET: bold-bi-reports-buildx
   ARM_SUBNET: bold-bi-reports-buildx-subnet
   CLOUD_BUILDER_ENDPOINT: syncfusion/boldbi-cloud
@@ -20,7 +20,7 @@ parameters:
   - name: boldbiPackage
     displayName: BoldBI Package
     type: string
-    default: https://s3.amazonaws.com/files2.syncfusion.com/Installs/BoldBI/07-08-2026/BoldBIServer_Linux_Docker_16.2.5_08072026_091439.zip
+    default: ""
   - name: environment
     displayName: Environment
     type: string
