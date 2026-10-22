@@ -8,7 +8,7 @@ variables:
   ARM_VM_NAME: boldreports-arm-$(Build.BuildId)
   BUILDER_NAME: boldreports-builder-$(Build.BuildId)
   ARM_VNET: bold-bi-reports-buildx
-  ARM_SUBNET: bold-bi-reports-buildx-subnet
+  ARM_SUBNET: snet-centralindia-1
   CLOUD_BUILDER_ENDPOINT: syncfusion/boldbi-cloud
   ARM_ADMIN_PASSWORD: Admin@123123
 
