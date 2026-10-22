@@ -1,14 +1,15 @@
 trigger: none
 
 variables:
-  AZ_SERVICE_CONNECTION: boldreports-self-host-buildx-testing
-  ARM_RG: boldbi-test
-  ARM_VMSS: boldreports-arm64-buildx-vmss
-  ARM_IMAGE_ID: /subscriptions/b7ba5c62-bc85-451a-a00e-0a9ceddf48c3/resourceGroups/boldbi-test/providers/Microsoft.Compute/galleries/boldreports_ga/images/boldreports_buildx_arm64/versions/0.0.1
+  AZ_SERVICE_CONNECTION: bold-reports-buildx-services-connection
+  ARM_RG: bold-bi-reports-buildx
+  ARM_IMAGE_ID: /subscriptions/80e2133e-f876-4916-806d-cd252db82d0d/resourceGroups/bold-bi-reports-buildx/providers/Microsoft.Compute/galleries/bold_bi_reports_buildx_image_gallery/images/bold_bi_reports_buildx_arm64_image/versions/1.0.0
   ARM_VM_SIZE: Standard_D2ps_v6
-  ARM_VM_NAME: boldreports-sh-arm-$(Build.BuildId)
-  BUILDER_NAME: boldreports-sh-builder-$(Build.BuildId)
-  CLOUD_BUILDER_ENDPOINT: syncfusion/boldreports-cloud   # TODO: confirm the real Docker Build Cloud builder name
+  ARM_VM_NAME: boldreports-arm-$(Build.BuildId)
+  BUILDER_NAME: boldreports-builder-$(Build.BuildId)
+  ARM_VNET: bold-bi-reports-buildx
+  ARM_SUBNET: bold-bi-reports-buildx-subnet
+  CLOUD_BUILDER_ENDPOINT: syncfusion/boldbi-cloud
   ARM_ADMIN_PASSWORD: Admin@123123
 
 parameters:
@@ -103,8 +104,8 @@ stages:
               --security-type TrustedLaunch
               --enable-secure-boot true
               --enable-vtpm true
-              --vnet-name buildx-vnet
-              --subnet buildx-sub
+              --vnet-name "$(ARM_VNET)"
+              --subnet "$(ARM_SUBNET)"
               --nsg ""
               --public-ip-address ""
               --admin-username azureuser
